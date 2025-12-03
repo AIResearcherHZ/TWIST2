@@ -45,14 +45,35 @@ from .g1.g1_mimic_distill_config import G1MimicStuRLCfg, G1MimicStuRLCfgDAgger
 from .g1.g1_mimic_future import G1MimicFuture
 from .g1.g1_mimic_future_config import G1MimicStuFutureCfg, G1MimicStuFutureCfgDAgger
 
+# Taks_T1 robot imports
+from .taks_t1.taks_t1_mimic_config import TaksT1MimicCfg, TaksT1MimicCfgPPO
+from .taks_t1.taks_t1_mimic import TaksT1Mimic
+from .taks_t1.taks_t1_mimic_distill import TaksT1MimicDistill
+from .taks_t1.taks_t1_mimic_distill_config import (
+    TaksT1MimicPrivCfg, TaksT1MimicPrivCfgPPO,
+    TaksT1MimicStuCfg, TaksT1MimicStuCfgDAgger,
+    TaksT1MimicStuRLCfg, TaksT1MimicStuRLCfgDAgger
+)
+from .taks_t1.taks_t1_mimic_future import TaksT1MimicFuture
+from .taks_t1.taks_t1_mimic_future_config import (
+    TaksT1MimicStuFutureCfg, TaksT1MimicStuFutureCfgDAgger
+)
+
 from legged_gym.gym_utils.task_registry import task_registry
 
 
-# DeepMimic (for teleoperation)
+# DeepMimic (for teleoperation) - G1
 task_registry.register("g1_mimic", G1Mimic, G1MimicCfg(), G1MimicCfgPPO())
 task_registry.register("g1_stu_mimic", G1MimicDistill, G1MimicStuCfg(), G1MimicStuCfgDAgger())
 task_registry.register("g1_priv_mimic", G1MimicDistill, G1MimicPrivCfg(), G1MimicPrivCfgPPO())
 task_registry.register("g1_stu_rl", G1MimicDistill, G1MimicStuRLCfg(), G1MimicStuRLCfgDAgger())
 task_registry.register("g1_stu_future", G1MimicFuture, G1MimicStuFutureCfg(), G1MimicStuFutureCfgDAgger())
+
+# DeepMimic (for teleoperation) - Taks_T1
+task_registry.register("taks_t1_mimic", TaksT1Mimic, TaksT1MimicCfg(), TaksT1MimicCfgPPO())
+task_registry.register("taks_t1_stu_mimic", TaksT1MimicDistill, TaksT1MimicStuCfg(), TaksT1MimicStuCfgDAgger())
+task_registry.register("taks_t1_priv_mimic", TaksT1MimicDistill, TaksT1MimicPrivCfg(), TaksT1MimicPrivCfgPPO())
+task_registry.register("taks_t1_stu_rl", TaksT1MimicDistill, TaksT1MimicStuRLCfg(), TaksT1MimicStuRLCfgDAgger())
+task_registry.register("taks_t1_stu_future", TaksT1MimicFuture, TaksT1MimicStuFutureCfg(), TaksT1MimicStuFutureCfgDAgger())
 
 
