@@ -86,10 +86,11 @@
                   <inertial pos="0.025052 -0.005381 -0.04" mass="0.56" diaginertia="0.000415333 0.00146533 0.00164733"/>
                   <joint name="left_ankle_roll_joint" pos="0 0 0" axis="1 0 0" range="-0.2618 0.2618" actuatorfrcrange="-27 27" armature="0.01"/>
                   <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1.0 1.0 1.0 1" mesh="left_ankle_roll_link"/>
-                  <geom size="0.005" pos="-0.05 0.025 -0.03" rgba="1.0 1.0 1.0 1"/>
-                  <geom size="0.005" pos="-0.05 -0.025 -0.03" rgba="1.0 1.0 1.0 1"/>
-                  <geom size="0.005" pos="0.12 0.03 -0.03" rgba="1.0 1.0 1.0 1"/>
-                  <geom size="0.005" pos="0.12 -0.03 -0.03" rgba="1.0 1.0 1.0 1"/>
+                  <geom type="mesh" rgba="1.0 1.0 1.0 1" mesh="left_ankle_roll_link"/>
+                  <geom size="0.005" pos="-0.05 0.025 -0.03" contype="1" conaffinity="1" rgba="1.0 1.0 1.0 1"/>
+                  <geom size="0.005" pos="-0.05 -0.025 -0.03" contype="1" conaffinity="1" rgba="1.0 1.0 1.0 1"/>
+                  <geom size="0.005" pos="0.12 0.03 -0.03" contype="1" conaffinity="1" rgba="1.0 1.0 1.0 1"/>
+                  <geom size="0.005" pos="0.12 -0.03 -0.03" contype="1" conaffinity="1" rgba="1.0 1.0 1.0 1"/>
                 </body>
               </body>
             </body>
@@ -134,10 +135,11 @@
                   <inertial pos="0.025052 0.005381 -0.04" mass="0.56" diaginertia="0.000415333 0.00146533 0.00164733"/>
                   <joint name="right_ankle_roll_joint" pos="0 0 0" axis="1 0 0" range="-0.2618 0.2618" actuatorfrcrange="-27 27" armature="0.01"/>
                   <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1.0 1.0 1.0 1" mesh="right_ankle_roll_link"/>
-                  <geom size="0.005" pos="-0.05 0.025 -0.03" rgba="1.0 1.0 1.0 1"/>
-                  <geom size="0.005" pos="-0.05 -0.025 -0.03" rgba="1.0 1.0 1.0 1"/>
-                  <geom size="0.005" pos="0.12 0.03 -0.03" rgba="1.0 1.0 1.0 1"/>
-                  <geom size="0.005" pos="0.12 -0.03 -0.03" rgba="1.0 1.0 1.0 1"/>
+                  <geom type="mesh" rgba="1.0 1.0 1.0 1" mesh="right_ankle_roll_link"/>
+                  <geom size="0.005" pos="-0.05 0.025 -0.03" contype="1" conaffinity="1" rgba="1.0 1.0 1.0 1"/>
+                  <geom size="0.005" pos="-0.05 -0.025 -0.03" contype="1" conaffinity="1" rgba="1.0 1.0 1.0 1"/>
+                  <geom size="0.005" pos="0.12 0.03 -0.03" contype="1" conaffinity="1" rgba="1.0 1.0 1.0 1"/>
+                  <geom size="0.005" pos="0.12 -0.03 -0.03" contype="1" conaffinity="1" rgba="1.0 1.0 1.0 1"/>
                 </body>
               </body>
             </body>
@@ -165,6 +167,7 @@
             <geom type="mesh" rgba="1.0 1.0 1.0 1" mesh="waist_pitch_link"/>
             <site name="imu_in_torso" size="0.01" pos="0.0 0.0 0.2"/>
             <body name="imu_in_torso" pos="0.0 0.0 0.2"></body>
+            <body name="head_mocap" pos="0.0 0.032906 0.5"></body>
 
             <!-- Left Arm -->
             <body name="left_shoulder_pitch_link" pos="0.0 0.13582 0.33654" quat="0.9659258 0.2588190 0 0">

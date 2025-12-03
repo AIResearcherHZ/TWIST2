@@ -314,9 +314,9 @@ class TaksT1MimicPrivCfg(HumanoidMimicCfg):
                       "left_ankle_roll_link", "right_ankle_roll_link",
                       "left_knee_link", "right_knee_link",
                       "left_elbow_link", "right_elbow_link",
-                      "head_mocap"]
+                      "neck_pitch_link"]
         upper_key_bodies = ["left_wrist_pitch_link", "right_wrist_pitch_link",
-                           "left_elbow_link", "right_elbow_link", "head_mocap"]
+                           "left_elbow_link", "right_elbow_link", "neck_pitch_link"]
         sample_ratio = 1.0
         motion_smooth = True
         motion_decompose = False
