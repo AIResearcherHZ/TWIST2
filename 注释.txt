@@ -1,0 +1,23 @@
+================================================================================
+                              仓库与环境准备
+================================================================================
+【Git 仓库克隆】
+git clone https://github.com/AIResearcherHZ/isaaclab.git
+git clone https://github.com/AIResearcherHZ/S2S2R.git
+git clone https://github.com/AIResearcherHZ/whole_body_tracking.git
+git clone https://github.com/AIResearcherHZ/GMR.git
+git clone --recurse-submodules https://github.com/AIResearcherHZ/TWIST2.git
+git clone --recurse-submodules https://github.com/AIResearcherHZ/HOVER
+
+
+【服务器 VNC】
+/opt/TurboVNC/bin/vncserver \
+  -wm xfce \
+  -securitytypes none
+
+
+================================================================================
+                                    训练
+================================================================================
+# 训练
+bash train.sh 1203_twist2 cuda:0

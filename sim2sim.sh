@@ -1,3 +1,7 @@
+# Set LD_LIBRARY_PATH for isaacgym
+export LD_LIBRARY_PATH=/home/xhz/anaconda3/envs/twist2/lib:$LD_LIBRARY_PATH
+
+
 SCRIPT_DIR=$(dirname $(realpath $0))
 ckpt_path=${SCRIPT_DIR}/assets/ckpts/twist2_1017_20k.onnx
 

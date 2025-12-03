@@ -1,3 +1,6 @@
+# Set LD_LIBRARY_PATH for isaacgym
+export LD_LIBRARY_PATH=/home/xhz/anaconda3/envs/twist2/lib:$LD_LIBRARY_PATH
+
 # sudo ufw disable
 
 source ~/miniconda3/bin/activate gmr

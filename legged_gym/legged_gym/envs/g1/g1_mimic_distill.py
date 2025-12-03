@@ -10,8 +10,6 @@ from legged_gym.envs.base.legged_robot import euler_from_quaternion
 from legged_gym.envs.base.humanoid_char import convert_to_local_root_body_pos, convert_to_global_root_body_pos
 
 
-
-
 class G1MimicDistill(HumanoidMimic):
     def __init__(self, cfg: G1MimicPrivCfg, sim_params, physics_engine, sim_device, headless):
         self.cfg = cfg
