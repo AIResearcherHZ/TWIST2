@@ -36,7 +36,7 @@ import numpy as np
 from loop_rate_limiters import RateLimiter
 from scipy.spatial.transform import Rotation as R
 from general_motion_retargeting import GeneralMotionRetargeting as GMR
-from general_motion_retargeting.utils.draw import draw_frame
+from general_motion_retargeting import draw_frame
 from general_motion_retargeting import ROBOT_XML_DICT, ROBOT_BASE_DICT
 from general_motion_retargeting import human_head_to_robot_neck
 from rich import print
