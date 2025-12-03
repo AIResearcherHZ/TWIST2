@@ -75,5 +75,3 @@ task_registry.register("taks_t1_stu_mimic", TaksT1MimicDistill, TaksT1MimicStuCf
 task_registry.register("taks_t1_priv_mimic", TaksT1MimicDistill, TaksT1MimicPrivCfg(), TaksT1MimicPrivCfgPPO())
 task_registry.register("taks_t1_stu_rl", TaksT1MimicDistill, TaksT1MimicStuRLCfg(), TaksT1MimicStuRLCfgDAgger())
 task_registry.register("taks_t1_stu_future", TaksT1MimicFuture, TaksT1MimicStuFutureCfg(), TaksT1MimicStuFutureCfgDAgger())
-
-

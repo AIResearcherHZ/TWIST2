@@ -247,6 +247,41 @@ class TaksT1MimicCfg(HumanoidMimicCfg):
 
         action_delay = (True and domain_rand_general)
         action_buf_len = 8
+        
+        # ==================== 新增鲁棒性随机化 ====================
+        action_noise = (True and domain_rand_general)
+        action_noise_std = 0.01
+        
+        encoder_noise = (True and domain_rand_general)
+        encoder_pos_noise_std = 0.005
+        encoder_vel_noise_std = 0.01
+        encoder_pos_bias_range = [-0.01, 0.01]
+        encoder_vel_bias_range = [-0.02, 0.02]
+        
+        imu_noise = (True and domain_rand_general)
+        imu_ang_vel_noise_std = 0.02
+        imu_lin_acc_noise_std = 0.05
+        imu_ang_vel_bias_range = [-0.1, 0.1]
+        imu_lin_acc_bias_range = [-0.2, 0.2]
+        imu_bias_drift_std = 0.01
+        
+        observation_dropout = (True and domain_rand_general)
+        observation_dropout_prob = 0.001
+        observation_dropout_mode = 'hold'
+        
+        joint_failure = (False and domain_rand_general)
+        joint_failure_prob = 0.0001
+        joint_failure_mode = 'weak'
+        joint_failure_weak_factor = 0.5
+        
+        sensor_latency_spike = (True and domain_rand_general)
+        sensor_latency_spike_prob = 0.001
+        sensor_latency_max_steps = 10
+        
+        slope_randomization = (True and domain_rand_general)
+        gravity_bias_x_range = [-0.1, 0.1]
+        gravity_bias_y_range = [-0.1, 0.1]
+        gravity_bias_z_range = [-0.05, 0.05]
     
     class noise(HumanoidMimicCfg.noise):
         add_noise = True
