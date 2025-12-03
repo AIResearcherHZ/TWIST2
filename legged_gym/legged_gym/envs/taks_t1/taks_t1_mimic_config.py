@@ -249,39 +249,46 @@ class TaksT1MimicCfg(HumanoidMimicCfg):
         action_buf_len = 8
         
         # ==================== 新增鲁棒性随机化 ====================
+        # 动作噪声 - 模拟控制信号不完美（量化误差、通讯抖动）
         action_noise = (True and domain_rand_general)
         action_noise_std = 0.01
         
+        # 关节编码器噪声 - 模拟编码器测量误差和零点偏移
         encoder_noise = (True and domain_rand_general)
-        encoder_pos_noise_std = 0.005
-        encoder_vel_noise_std = 0.01
-        encoder_pos_bias_range = [-0.01, 0.01]
-        encoder_vel_bias_range = [-0.02, 0.02]
+        encoder_pos_noise_std = 0.005  # 位置噪声标准差 (rad)
+        encoder_vel_noise_std = 0.01   # 速度噪声标准差 (rad/s)
+        encoder_pos_bias_range = [-0.01, 0.01]  # 位置偏置范围 (rad)
+        encoder_vel_bias_range = [-0.02, 0.02]  # 速度偏置范围 (rad/s)
         
+        # IMU噪声和漂移 - 模拟真实IMU的测量特性
         imu_noise = (True and domain_rand_general)
-        imu_ang_vel_noise_std = 0.02
-        imu_lin_acc_noise_std = 0.05
+        imu_ang_vel_noise_std = 0.02  # 角速度噪声 (rad/s)
+        imu_lin_acc_noise_std = 0.05  # 线加速度噪声 (m/s^2)
         imu_ang_vel_bias_range = [-0.1, 0.1]
         imu_lin_acc_bias_range = [-0.2, 0.2]
-        imu_bias_drift_std = 0.01
+        imu_bias_drift_std = 0.01  # 偏置漂移
         
+        # 观测丢包 - 模拟传感器偶发失效
         observation_dropout = (True and domain_rand_general)
-        observation_dropout_prob = 0.001
-        observation_dropout_mode = 'hold'
+        observation_dropout_prob = 0.001  # 每个维度丢包概率 0.1%
+        observation_dropout_mode = 'hold'  # 丢包时保持上一帧值 ('hold' or 'zero')
         
-        joint_failure = (False and domain_rand_general)
-        joint_failure_prob = 0.0001
-        joint_failure_mode = 'weak'
-        joint_failure_weak_factor = 0.5
+        # 关节故障 - 模拟电机故障（极低概率）
+        joint_failure = (False and domain_rand_general)  # 默认关闭，太激进
+        joint_failure_prob = 0.0001  # 每个关节失效概率 0.01%
+        joint_failure_mode = 'weak'  # 弱化模式（扭矩衰减）
+        joint_failure_weak_factor = 0.5  # 衰减因子
         
+        # 传感器延迟尖峰 - 模拟偶发的通讯阻塞
         sensor_latency_spike = (True and domain_rand_general)
-        sensor_latency_spike_prob = 0.001
-        sensor_latency_max_steps = 10
+        sensor_latency_spike_prob = 0.001  # 0.1%概率发生延迟尖峰
+        sensor_latency_max_steps = 10  # 最大延迟10步
         
+        # 重力方向偏置 - 模拟基座倾斜/坡度
         slope_randomization = (True and domain_rand_general)
-        gravity_bias_x_range = [-0.1, 0.1]
-        gravity_bias_y_range = [-0.1, 0.1]
-        gravity_bias_z_range = [-0.05, 0.05]
+        gravity_bias_x_range = [-0.1, 0.1]  # x方向重力偏置 (m/s^2)
+        gravity_bias_y_range = [-0.1, 0.1]  # y方向重力偏置 (m/s^2)
+        gravity_bias_z_range = [-0.05, 0.05]  # z方向重力偏置 (m/s^2)
     
     class noise(HumanoidMimicCfg.noise):
         add_noise = True
