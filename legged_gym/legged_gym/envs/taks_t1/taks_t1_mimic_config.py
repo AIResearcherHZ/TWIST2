@@ -53,7 +53,7 @@ class TaksT1MimicCfg(HumanoidMimicCfg):
         horizontal_scale = 0.1
     
     class init_state(HumanoidMimicCfg.init_state):
-        pos = [0, 0, 0.75]
+        pos = [0, 0, 1.0]
         default_joint_angles = {
             'left_hip_pitch_joint': 0.0,
             'left_hip_roll_joint': 0.0,
@@ -128,7 +128,8 @@ class TaksT1MimicCfg(HumanoidMimicCfg):
         clip_actions = 5.0
     
     class asset(HumanoidMimicCfg.asset):
-        file = f'{LEGGED_GYM_ROOT_DIR}/../assets/Taks_T1/urdf/Taks_T1.urdf'
+        file = f'{LEGGED_GYM_ROOT_DIR}/../assets/Taks_T1/Taks_T1_sim2sim.xml'
+        # self_collisions = 1  # 1 to disable self-collisions
         
         torso_name: str = 'pelvis'
         chest_name: str = 'imu_in_torso'
