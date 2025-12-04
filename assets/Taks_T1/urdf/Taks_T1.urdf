@@ -996,6 +996,20 @@
     <limit lower="-0.9" upper="0.9" effort="7.0" velocity="20.944"/>
   </joint>
 
+  <!-- Head Mocap (virtual link for motion tracking) -->
+  <link name="head_mocap">
+    <inertial>
+      <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+      <mass value="0.001"/>
+      <inertia ixx="1e-09" ixy="0.0" ixz="0.0" iyy="1e-09" iyz="0.0" izz="1e-09"/>
+    </inertial>
+  </link>
+  <joint name="head_mocap_joint" type="fixed">
+    <origin xyz="0.0 0.032906 0.37165" rpy="0 0 0"/>
+    <parent link="torso_link"/>
+    <child link="head_mocap"/>
+  </joint>
+
   <!-- Neck -->
   <link name="neck_yaw_link">
     <inertial>
