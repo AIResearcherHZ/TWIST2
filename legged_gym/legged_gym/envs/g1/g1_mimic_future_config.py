@@ -164,7 +164,7 @@ class G1MimicStuFutureCfgDAgger(G1MimicStuFutureCfg):
         policy_class_name = 'ActorCriticFuture'
         algorithm_class_name = 'DaggerPPO'
         runner_class_name = 'OnPolicyDaggerRunner'
-        max_iterations = 30_001
+        max_iterations = 10001
         warm_iters = 100
         
         # logging
