@@ -155,8 +155,6 @@
             <joint name="waist_pitch_joint" pos="0 0 0" axis="0 1 0" range="-0.52 0.52" actuatorfrcrange="-97 97" armature="0.01"/>
             <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1.0 1.0 1.0 1" mesh="waist_pitch_link"/>
             <geom type="mesh" rgba="1.0 1.0 1.0 1" mesh="waist_pitch_link"/>
-            <site name="imu_in_torso" size="0.01" pos="0.0 0.0 0.2"/>
-            <body name="imu_in_torso" pos="0.0 0.0 0.2"></body>
 
             <!-- Left Arm -->
             <body name="left_shoulder_pitch_link" pos="0.0 0.13582 0.33654" quat="0.9659258 0.2588190 0 0">
