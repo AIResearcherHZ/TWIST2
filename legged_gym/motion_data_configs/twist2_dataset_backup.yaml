@@ -1,5 +1,4 @@
-# root_path: /home/yanjieze/projects/g1_wbc/TWIST-dev/motion_data/TWIST2_full
-root_path: /home/xhz/GMR/data/TWIST2_dataset/
+root_path: ../../../GMR/data/TWIST2_dataset/
 motions:
 - file: OMOMO_g1_GMR/sub1_clothesstand_000.pkl
   weight: 1.0

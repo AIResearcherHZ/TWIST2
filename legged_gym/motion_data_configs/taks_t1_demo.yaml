@@ -1,4 +1,4 @@
-root_path: /home/xhz/GMR/data/TWIST2_dataset/
+root_path: ../../../GMR/data/TWIST2_dataset/
 motions:
 - file: example_motions_taks_t1/0807_yanjie_walk_001.pkl
   weight: 1.0

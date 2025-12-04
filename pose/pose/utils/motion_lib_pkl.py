@@ -314,6 +314,10 @@ class MotionLib:
                 motion_config = yaml.load(f, Loader=yaml.SafeLoader)
             
             motion_root_path = motion_config["root_path"]
+            # 如果是相对路径，则相对于yaml文件所在目录解析
+            if not os.path.isabs(motion_root_path):
+                yaml_dir = os.path.dirname(os.path.abspath(motion_file))
+                motion_root_path = os.path.normpath(os.path.join(yaml_dir, motion_root_path))
             motion_list = motion_config["motions"]
             for motion_entry in motion_list:
                 curr_file = os.path.join(motion_root_path, motion_entry['file'])
