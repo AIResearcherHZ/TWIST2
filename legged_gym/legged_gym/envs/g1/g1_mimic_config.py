@@ -351,7 +351,7 @@ class G1MimicCfgPPO(HumanoidMimicCfgPPO):
         policy_class_name = 'ActorCriticMimic'
         algorithm_class_name = 'PPO'
         runner_class_name = 'OnPolicyRunner'
-        max_iterations = 30002 # number of policy updates
+        max_iterations = 10001 # number of policy updates
 
         # logging
         save_interval = 500 # check for potential saves every this many iterations

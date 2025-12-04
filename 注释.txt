@@ -20,7 +20,7 @@ git clone --recurse-submodules https://github.com/AIResearcherHZ/HOVER
                                     训练
 ================================================================================
 # 训练
-bash train.sh 1203_twist2 cuda:0
+bash train.sh 1204_twist2 cuda:0
 
 
 

@@ -11,7 +11,7 @@ export LD_LIBRARY_PATH=/home/xhz/anaconda3/envs/twist2/lib:$LD_LIBRARY_PATH
 
 cd legged_gym/legged_gym/scripts
 
-robot_name="taks_t1"
+robot_name="g1"
 exptid=$1
 device=$2
 
@@ -20,9 +20,9 @@ proj_name="${robot_name}_stu_future"
 
 python train.py --task "${task_name}" \
                 --proj_name "${proj_name}" \
-                --num_envs 1 \
+                --num_envs 8192 \
                 --exptid "${exptid}" \
                 --device "${device}" \
                 --teacher_exptid "None" \
-                --debug \
+                # --debug \
                 # --resume \
