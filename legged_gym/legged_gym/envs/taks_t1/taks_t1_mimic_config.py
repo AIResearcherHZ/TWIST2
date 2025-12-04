@@ -55,18 +55,18 @@ class TaksT1MimicCfg(HumanoidMimicCfg):
     class init_state(HumanoidMimicCfg.init_state):
         pos = [0, 0, 0.75]
         default_joint_angles = {
-            'left_hip_pitch_joint': -0.2,
+            'left_hip_pitch_joint': 0.0,
             'left_hip_roll_joint': 0.0,
             'left_hip_yaw_joint': 0.0,
-            'left_knee_joint': 0.4,
-            'left_ankle_pitch_joint': -0.2,
+            'left_knee_joint': 0.0,
+            'left_ankle_pitch_joint': 0.0,
             'left_ankle_roll_joint': 0.0,
             
-            'right_hip_pitch_joint': -0.2,
+            'right_hip_pitch_joint': 0.0,
             'right_hip_roll_joint': 0.0,
             'right_hip_yaw_joint': 0.0,
-            'right_knee_joint': 0.4,
-            'right_ankle_pitch_joint': -0.2,
+            'right_knee_joint': 0.0,
+            'right_ankle_pitch_joint': 0.0,
             'right_ankle_roll_joint': 0.0,
             
             'waist_yaw_joint': 0.0,
@@ -74,17 +74,17 @@ class TaksT1MimicCfg(HumanoidMimicCfg):
             'waist_pitch_joint': 0.0,
             
             'left_shoulder_pitch_joint': 0.0,
-            'left_shoulder_roll_joint': 0.4,
+            'left_shoulder_roll_joint': 0.0,
             'left_shoulder_yaw_joint': 0.0,
-            'left_elbow_joint': 0.8,
+            'left_elbow_joint': 0.0,
             'left_wrist_roll_joint': 0.0,
             'left_wrist_yaw_joint': 0.0,
             'left_wrist_pitch_joint': 0.0,
             
             'right_shoulder_pitch_joint': 0.0,
-            'right_shoulder_roll_joint': -0.4,
+            'right_shoulder_roll_joint': 0.0,
             'right_shoulder_yaw_joint': 0.0,
-            'right_elbow_joint': 0.8,
+            'right_elbow_joint': 0.0,
             'right_wrist_roll_joint': 0.0,
             'right_wrist_yaw_joint': 0.0,
             'right_wrist_pitch_joint': 0.0,
