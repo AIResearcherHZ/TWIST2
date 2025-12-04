@@ -353,7 +353,7 @@ class TaksT1MimicPrivCfgPPO(HumanoidMimicCfgPPO):
         policy_class_name = 'ActorCriticMimic'
         algorithm_class_name = 'PPO'
         runner_class_name = 'OnPolicyRunnerMimic'
-        max_iterations = 1_000_002
+        max_iterations = 1000001
 
         save_interval = 500
         experiment_name = 'test'
@@ -389,7 +389,7 @@ class TaksT1MimicStuCfgDAgger(TaksT1MimicPrivCfgPPO):
         policy_class_name = 'DAggerActor'
         algorithm_class_name = 'DAgger'
         runner_class_name = 'DAggerRunner'
-        max_iterations = 1_000_002
+        max_iterations = 1000001
         warm_iters = 100
         
         save_interval = 500
@@ -428,7 +428,7 @@ class TaksT1MimicStuRLCfgDAgger(TaksT1MimicStuRLCfg):
         policy_class_name = 'ActorCriticTeleop'
         algorithm_class_name = 'DaggerPPO'
         runner_class_name = 'OnPolicyDaggerRunner'
-        max_iterations = 1_000_002
+        max_iterations = 1000001
         warm_iters = 100
         
         save_interval = 500
