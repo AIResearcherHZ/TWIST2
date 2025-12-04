@@ -15,6 +15,8 @@ git clone --recurse-submodules https://github.com/AIResearcherHZ/HOVER
   -wm xfce \
   -securitytypes none
 
+【环境测试】
+bash run_motion_server.sh
 
 ================================================================================
                                     训练
