@@ -15,6 +15,9 @@ git clone --recurse-submodules https://github.com/AIResearcherHZ/HOVER
   -wm xfce \
   -securitytypes none
 
+【预启动】
+redis-server --daemonize yes
+
 【环境测试】
 bash run_motion_server.sh
 
