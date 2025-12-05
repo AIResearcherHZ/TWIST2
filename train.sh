@@ -12,7 +12,7 @@ export LD_LIBRARY_PATH=/opt/conda/envs/twist2/lib:$LD_LIBRARY_PATH
 
 cd legged_gym/legged_gym/scripts
 
-robot_name="taks_t1"
+robot_name="g1"
 exptid=$1
 device=$2
 
