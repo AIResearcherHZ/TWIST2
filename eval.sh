@@ -1,18 +1,23 @@
 
 # bash eval.sh 1002_twist2 cuda:1
 
-export LD_LIBRARY_PATH=/opt/conda/envs/twist2/lib:$LD_LIBRARY_PATH
+# export LD_LIBRARY_PATH=/opt/conda/envs/twist2/lib:$LD_LIBRARY_PATH
 
 # Set LD_LIBRARY_PATH for isaacgym
-# export LD_LIBRARY_PATH=/home/xhz/anaconda3/envs/twist2/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/home/xhz/anaconda3/envs/twist2/lib:$LD_LIBRARY_PATH
 
-# motion_file="/home/yanjieze/projects/g1_wbc/TWIST-dev/motion_data/v1_v2_v3_g1/0807_yanjie_walk_001.pkl"
-motion_file="/home/yanjieze/projects/g1_wbc/TWIST-dev/motion_data/twist1_to_twist2/transitions_walksideways_walkbackwards.pkl"
+# 相对路径（相对于TWIST2根目录）
+motion_file_rel="../GMR/data/TWIST2_dataset/example_motions_g1/0807_yanjie_walk_004.pkl"
+# 转换为绝对路径
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+motion_file="$(cd "$SCRIPT_DIR" && realpath "$motion_file_rel")"
 
-task_name="g1_stu_future"
-proj_name="g1_stu_future"
+robot_name="g1"
 exptid=$1
 device=$2
+
+task_name="${robot_name}_stu_future"
+proj_name="${robot_name}_stu_future"
 
 cd legged_gym/legged_gym/scripts
 

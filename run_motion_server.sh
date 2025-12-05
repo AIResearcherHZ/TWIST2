@@ -1,9 +1,9 @@
 #!/bin/bash
 
-export LD_LIBRARY_PATH=/opt/conda/envs/twist2/lib:$LD_LIBRARY_PATH
+# export LD_LIBRARY_PATH=/opt/conda/envs/twist2/lib:$LD_LIBRARY_PATH
 
 # Set LD_LIBRARY_PATH for isaacgym
-# export LD_LIBRARY_PATH=/home/xhz/anaconda3/envs/twist2/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/home/xhz/anaconda3/envs/twist2/lib:$LD_LIBRARY_PATH
 
 script_dir=$(dirname $(realpath $0))
 # motion_file="${script_dir}/assets/example_motions/0807_yanjie_walk_005.pkl"
