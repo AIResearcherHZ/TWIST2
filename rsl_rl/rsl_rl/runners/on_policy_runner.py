@@ -37,6 +37,8 @@ from rich import print
 # from torch.utils.tensorboard import SummaryWriter
 import torch
 import torch.optim as optim
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
 import wandb
 # import ml_runlog
 import datetime
@@ -52,13 +54,33 @@ import warnings
 # from rsl_rl.utils.running_mean_std import RunningMeanStd
 from rsl_rl.utils.normalizer import Normalizer
 
+
+def reduce_tensor(tensor, world_size):
+    """Reduce tensor across all processes."""
+    if world_size == 1:
+        return tensor
+    rt = tensor.clone()
+    dist.all_reduce(rt, op=dist.ReduceOp.SUM)
+    rt /= world_size
+    return rt
+
+
+def is_main_process(rank):
+    """Check if this is the main process."""
+    return rank == 0
+
 class OnPolicyRunner:
 
     def __init__(self,
                  env: VecEnv,
                  train_cfg,
                  log_dir=None,
-                 device='cpu', **kwargs):
+                 device='cpu',
+                 distributed=False,
+                 world_size=1,
+                 rank=0,
+                 local_rank=0,
+                 **kwargs):
 
         self.cfg=train_cfg["runner"]
         self.alg_cfg = train_cfg["algorithm"]
@@ -66,6 +88,12 @@ class OnPolicyRunner:
         self.device = device
         self.env = env
         self.normalize_obs = env.cfg.env.normalize_obs
+        
+        # Distributed training settings
+        self.distributed = distributed
+        self.world_size = world_size
+        self.rank = rank
+        self.local_rank = local_rank
 
         policy_class = eval(self.cfg["policy_class_name"])
         if "Transformer" in self.cfg["policy_class_name"]:
@@ -101,7 +129,11 @@ class OnPolicyRunner:
         alg_class = eval(self.cfg["algorithm_class_name"]) # PPO
         self.alg = alg_class(self.env, 
                                   actor_critic,
-                                  device=self.device, **self.alg_cfg)
+                                  device=self.device,
+                                  distributed=self.distributed,
+                                  world_size=self.world_size,
+                                  rank=self.rank,
+                                  **self.alg_cfg)
         self.num_steps_per_env = self.cfg["num_steps_per_env"]
         self.save_interval = self.cfg["save_interval"]
         self.dagger_update_freq = self.alg_cfg["dagger_update_freq"]
@@ -238,21 +270,30 @@ class OnPolicyRunner:
             
             stop = time.time()
             learn_time = stop - start
-            if self.log_dir is not None:
-                self.log(locals())
-            if it <= 2500:
-                if it % self.save_interval == 0:
-                    self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
-            elif it <= 10000:
-                if it % (2*self.save_interval) == 0:
-                    self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
-            else:
-                if it % (5*self.save_interval) == 0:
-                    self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
+            
+            # Only log and save on main process
+            if is_main_process(self.rank):
+                if self.log_dir is not None:
+                    self.log(locals())
+                if it <= 2500:
+                    if it % self.save_interval == 0:
+                        self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
+                elif it <= 10000:
+                    if it % (2*self.save_interval) == 0:
+                        self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
+                else:
+                    if it % (5*self.save_interval) == 0:
+                        self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
+            
+            # Synchronize all processes after each iteration
+            if self.distributed:
+                dist.barrier()
+            
             ep_infos.clear()
         
         # self.current_learning_iteration += num_learning_iterations
-        self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(self.current_learning_iteration)))
+        if is_main_process(self.rank):
+            self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(self.current_learning_iteration)))
     
     def _need_normalizer_update(self, iterations, update_iterations):
         return iterations < update_iterations

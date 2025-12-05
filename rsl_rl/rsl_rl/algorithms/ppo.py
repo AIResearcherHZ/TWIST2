@@ -31,12 +31,23 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.distributed as dist
 import numpy as np
 
 from rsl_rl.modules import ActorCritic
 from rsl_rl.storage import RolloutStorage, ReplayBuffer
 from rsl_rl.utils import unpad_trajectories
 import time
+
+
+def reduce_tensor(tensor, world_size):
+    """Reduce tensor across all processes by averaging."""
+    if world_size == 1:
+        return tensor
+    rt = tensor.clone()
+    dist.all_reduce(rt, op=dist.ReduceOp.SUM)
+    rt /= world_size
+    return rt
 
 
 
@@ -62,12 +73,20 @@ class PPO:
                  grad_penalty_coef_schedule = [0.0, 0.0, 10, 10],
                  std_schedule = [1.0, 1.0, 10, 10],
                  num_hist=10,
+                 distributed=False,
+                 world_size=1,
+                 rank=0,
                  **kwargs
                  ):
 
         self.env = env
         self.device = device
         self.num_hist = num_hist
+        
+        # Distributed training settings
+        self.distributed = distributed
+        self.world_size = world_size
+        self.rank = rank
 
         self.desired_kl = desired_kl
         self.schedule = schedule
@@ -203,6 +222,14 @@ class PPO:
                 # Gradient step
                 self.optimizer.zero_grad()
                 loss.backward()
+                
+                # Synchronize gradients across all processes in distributed training
+                if self.distributed and self.world_size > 1:
+                    for param in self.actor_critic.parameters():
+                        if param.grad is not None:
+                            dist.all_reduce(param.grad, op=dist.ReduceOp.SUM)
+                            param.grad /= self.world_size
+                
                 nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.max_grad_norm)
                 self.optimizer.step()
 

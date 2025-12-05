@@ -102,7 +102,8 @@ class TaskRegistry():
                             headless=args.headless)
         return env, env_cfg
 
-    def make_alg_runner(self, env, name=None, args=None, train_cfg=None, log_root="default", **kwargs):
+    def make_alg_runner(self, env, name=None, args=None, train_cfg=None, log_root="default", 
+                         distributed=False, world_size=1, rank=0, local_rank=0, **kwargs):
         """ Creates the training algorithm  either from a registered namme or from the provided config file.
 
         Args:
@@ -112,6 +113,10 @@ class TaskRegistry():
             train_cfg (Dict, optional): Training config file. If None 'name' will be used to get the config file. Defaults to None.
             log_root (str, optional): Logging directory for Tensorboard. Set to 'None' to avoid logging (at test time for example). 
                                       Logs will be saved in <log_root>/<date_time>_<run_name>. Defaults to "default"=<path_to_LEGGED_GYM>/logs/<experiment_name>.
+            distributed (bool, optional): Whether to use distributed training. Defaults to False.
+            world_size (int, optional): Number of processes in distributed training. Defaults to 1.
+            rank (int, optional): Global rank of this process. Defaults to 0.
+            local_rank (int, optional): Local rank (GPU id) of this process. Defaults to 0.
 
         Raises:
             ValueError: Error if neither 'name' or 'train_cfg' are provided
@@ -149,7 +154,12 @@ class TaskRegistry():
         runner = runner_class(env, 
                                 train_cfg_dict, 
                                 log_dir, 
-                                device=args.rl_device, **kwargs)
+                                device=args.rl_device,
+                                distributed=distributed,
+                                world_size=world_size,
+                                rank=rank,
+                                local_rank=local_rank,
+                                **kwargs)
         #save resume path before creating a new log_dir
         resume = train_cfg.runner.resume
         if args.resumeid:

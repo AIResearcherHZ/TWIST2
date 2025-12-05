@@ -36,6 +36,17 @@ bash to_onnx.sh g1 legged_gym/logs/g1_stu_future/1204_twist2/model_10000.pt
 # SIM2SIM
 bash sim2sim.sh legged_gym/logs/g1_stu_future/1204_twist2/model_10000.onnx
 
+
+
+# 自动检测GPU数量
+bash train_multigpu.sh <experiment_id>
+
+# 指定GPU数量
+bash train_multigpu.sh <experiment_id> 2
+
+# 指定GPU数量和总环境数
+bash train_multigpu.sh <experiment_id> 4 16384
+
 Gym 可视化中的彩色点含义
 根据 
 humanoid_char.py
