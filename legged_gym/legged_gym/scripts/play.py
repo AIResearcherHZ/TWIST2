@@ -46,32 +46,53 @@ def get_load_path(root, load_run=-1, checkpoint=-1, model_name_include="jit"):
     return model, checkpoint
 
 def set_play_cfg(env_cfg):
-    env_cfg.env.num_envs = 2#2 if not args.num_envs else args.num_envs
+    env_cfg.env.num_envs = 2
     env_cfg.env.debug_viz = True
     env_cfg.env.episode_length_s = 60
-    # env_cfg.commands.resampling_time = 60
     env_cfg.terrain.num_rows = 5
     env_cfg.terrain.num_cols = 5
     env_cfg.terrain.curriculum = False
     env_cfg.terrain.max_difficulty = True
-    
+
+    # 禁用所有噪声
     env_cfg.noise.add_noise = False
+
+    # 禁用所有domain randomization（推理/评估时不需要）
+    env_cfg.domain_rand.domain_rand_general = False
     env_cfg.domain_rand.randomize_friction = False
+    env_cfg.domain_rand.randomize_gravity = False
     env_cfg.domain_rand.push_robots = False
-    env_cfg.domain_rand.push_interval_s = 5
-    env_cfg.domain_rand.max_push_vel_xy = 2.5
+    env_cfg.domain_rand.push_end_effector = False
     env_cfg.domain_rand.randomize_base_mass = False
     env_cfg.domain_rand.randomize_base_com = False
+    env_cfg.domain_rand.randomize_motor = False
     env_cfg.domain_rand.action_delay = False
-    
+
+    # 禁用新增的鲁棒性随机化
+    if hasattr(env_cfg.domain_rand, 'action_noise'):
+        env_cfg.domain_rand.action_noise = False
+    if hasattr(env_cfg.domain_rand, 'encoder_noise'):
+        env_cfg.domain_rand.encoder_noise = False
+    if hasattr(env_cfg.domain_rand, 'imu_noise'):
+        env_cfg.domain_rand.imu_noise = False
+    if hasattr(env_cfg.domain_rand, 'observation_dropout'):
+        env_cfg.domain_rand.observation_dropout = False
+    if hasattr(env_cfg.domain_rand, 'joint_failure'):
+        env_cfg.domain_rand.joint_failure = False
+    if hasattr(env_cfg.domain_rand, 'sensor_latency_spike'):
+        env_cfg.domain_rand.sensor_latency_spike = False
+    if hasattr(env_cfg.domain_rand, 'slope_randomization'):
+        env_cfg.domain_rand.slope_randomization = False
+
     if hasattr(env_cfg, "motion"):
         env_cfg.motion.motion_curriculum = False
-    
-    # Set evaluation mode with full masking for student future policies
+        # 禁用motion domain randomization
+        if hasattr(env_cfg.motion, 'motion_dr_enabled'):
+            env_cfg.motion.motion_dr_enabled = False
+
+    # Set evaluation mode
     if hasattr(env_cfg.env, 'obs_type') and env_cfg.env.obs_type == 'student_future':
-        # env_cfg.env.evaluation_mode = True
-        # env_cfg.env.force_full_masking = True
-        env_cfg.env.evaluation_mode = False
+        env_cfg.env.evaluation_mode = True
         env_cfg.env.force_full_masking = False
 
 

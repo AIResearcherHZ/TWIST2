@@ -255,3 +255,9 @@ class TaksT1Mimic(HumanoidMimic):
     def _reward_neck_dof_vel(self):
         neck_dof_idx = [29, 30, 31]
         return torch.sum(torch.square(self.dof_vel[:, neck_dof_idx]), dim=1)
+
+    def _reward_idle_penalty(self):
+        """Penalize joint movement when close to target or no motion command.
+        Encourages the robot to stay still when it has reached the target pose."""
+        joint_vel_magnitude = torch.sum(torch.square(self.dof_vel), dim=1)
+        return joint_vel_magnitude

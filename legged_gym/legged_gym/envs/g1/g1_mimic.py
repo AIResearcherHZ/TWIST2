@@ -202,3 +202,10 @@ class G1Mimic(HumanoidMimic):
     
     def _reward_ankle_action(self):
         return torch.norm(self.action_history_buf[:, -1, [4, 5, 10, 11]], dim=1)
+
+    def _reward_idle_penalty(self):
+        """Penalize joint movement when close to target or no motion command.
+        Encourages the robot to stay still when it has reached the target pose."""
+        # Compute joint velocity magnitude
+        joint_vel_magnitude = torch.sum(torch.square(self.dof_vel), dim=1)
+        return joint_vel_magnitude

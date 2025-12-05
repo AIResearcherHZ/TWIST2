@@ -274,6 +274,9 @@ class G1MimicFuture(G1MimicDistill):
         # Get motion observations
         if self.obs_type == 'student_future':
             priv_mimic_obs, mimic_obs, future_obs = self._get_mimic_obs()
+            # 缓存未来动作数据用于奖励计算
+            motion_data = self._get_unified_motion_data()
+            self._cache_future_motion_data(motion_data)
         else:
             priv_mimic_obs, mimic_obs = self._get_mimic_obs()
             future_obs = None
@@ -785,4 +788,59 @@ class G1MimicFuture(G1MimicDistill):
                 None,  # No torques
                 gymapi.ENV_SPACE
             )
+
+    # ==================== 未来动作一致性奖励 ====================
+    # 这些奖励只在训练时生效，不影响sim2sim/sim2real部署
+
+    def _reward_future_action_consistency(self):
+        """奖励当前动作与未来目标动作的一致性。"""
+        if not hasattr(self, '_cached_future_dof_pos'):
+            return torch.zeros(self.num_envs, device=self.device)
+
+        current_target_dof = (self.actions * self.cfg.control.action_scale +
+                              self.default_dof_pos_all)
+        future_dof_pos = self._cached_future_dof_pos
+        dof_diff = current_target_dof - future_dof_pos
+        dof_err = torch.sum(dof_diff ** 2, dim=-1)
+
+        return torch.exp(-0.5 * dof_err)
+
+    def _reward_future_yaw_consistency(self):
+        """奖励当前角速度与未来目标角速度的一致性。"""
+        if not hasattr(self, '_cached_future_yaw_ang_vel'):
+            return torch.zeros(self.num_envs, device=self.device)
+
+        current_yaw_ang_vel = self.base_ang_vel[:, 2]
+        future_yaw_ang_vel = self._cached_future_yaw_ang_vel
+        yaw_diff = current_yaw_ang_vel - future_yaw_ang_vel
+        yaw_err = yaw_diff ** 2
+
+        return torch.exp(-2.0 * yaw_err)
+
+    def _reward_turning_smoothness(self):
+        """惩罚转身时的角速度突变。"""
+        if not hasattr(self, '_last_base_ang_vel'):
+            self._last_base_ang_vel = self.base_ang_vel.clone()
+            return torch.zeros(self.num_envs, device=self.device)
+
+        ang_vel_change = self.base_ang_vel - self._last_base_ang_vel
+        yaw_acc = ang_vel_change[:, 2] ** 2
+        self._last_base_ang_vel = self.base_ang_vel.clone()
+
+        return yaw_acc
+
+    def _cache_future_motion_data(self, motion_data):
+        """缓存未来动作数据用于奖励计算。"""
+        if motion_data['num_future_steps'] == 0:
+            return
+
+        num_priv_steps = motion_data['num_priv_steps']
+        self._cached_future_dof_pos = motion_data['dof_pos'][:, num_priv_steps]
+        future_ang_vel_local = motion_data['root_ang_vel_local'][:, num_priv_steps]
+        self._cached_future_yaw_ang_vel = future_ang_vel_local[:, 2]
+
+    def _reward_idle_penalty(self):
+        """Penalize joint movement when close to target."""
+        joint_vel_magnitude = torch.sum(torch.square(self.dof_vel), dim=1)
+        return joint_vel_magnitude
     

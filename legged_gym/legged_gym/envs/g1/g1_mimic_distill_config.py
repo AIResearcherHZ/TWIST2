@@ -230,8 +230,8 @@ class G1MimicPrivCfg(HumanoidMimicCfg):
             ang_vel_xy = -0.01            
             ankle_dof_acc = -5e-8 * 2
             ankle_dof_vel = -1e-4 * 2
-            
-            
+            idle_penalty = -0.001
+
             # TWIST version
             # tracking_joint_dof = 0.6
             # tracking_joint_vel = 0.2

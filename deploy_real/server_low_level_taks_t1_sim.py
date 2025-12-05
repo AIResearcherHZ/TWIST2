@@ -101,60 +101,119 @@ class RealTimePolicyController:
         self.last_action = np.zeros(self.num_actions, dtype=np.float32)
 
         # Taks_T1 specific configuration
+        # Joint order from XML actuator section:
+        # left_hip_pitch, left_hip_roll, left_hip_yaw, left_knee, left_ankle_pitch, left_ankle_roll (6)
+        # right_hip_pitch, right_hip_roll, right_hip_yaw, right_knee, right_ankle_pitch, right_ankle_roll (6)
+        # waist_yaw, waist_roll, waist_pitch (3)
+        # left_shoulder_pitch, left_shoulder_roll, left_shoulder_yaw, left_elbow, left_wrist_roll, left_wrist_yaw, left_wrist_pitch (7)
+        # right_shoulder_pitch, right_shoulder_roll, right_shoulder_yaw, right_elbow, right_wrist_roll, right_wrist_yaw, right_wrist_pitch (7)
+        # neck_yaw, neck_roll, neck_pitch (3)
         self.default_dof_pos = np.array([
-                -0.2, 0.0, 0.0, 0.4, -0.2, 0.0,  # left leg (6)
-                -0.2, 0.0, 0.0, 0.4, -0.2, 0.0,  # right leg (6)
-                0.0, 0.0, 0.0,  # waist (3)
-                0.0, 0.4, 0.0, 0.8, 0.0, 0.0, 0.0,  # left arm (7)
-                0.0, -0.4, 0.0, 0.8, 0.0, 0.0, 0.0,  # right arm (7)
-                0.0, 0.0, 0.0,  # neck (3)
+                # left leg (6): hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll
+                -0.2, 0.0, 0.0, 0.4, -0.2, 0.0,
+                # right leg (6): hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll  
+                -0.2, 0.0, 0.0, 0.4, -0.2, 0.0,
+                # waist (3): yaw, roll, pitch
+                0.0, 0.0, 0.0,
+                # left arm (7): shoulder_pitch, shoulder_roll, shoulder_yaw, elbow, wrist_roll, wrist_yaw, wrist_pitch
+                0.0, 0.4, 0.0, 0.8, 0.0, 0.0, 0.0,
+                # right arm (7): shoulder_pitch, shoulder_roll, shoulder_yaw, elbow, wrist_roll, wrist_yaw, wrist_pitch
+                0.0, -0.4, 0.0, 0.8, 0.0, 0.0, 0.0,
+                # neck (3): yaw, roll, pitch
+                0.0, 0.0, 0.0,
             ])
 
+        # MuJoCo qpos: [x, y, z, qw, qx, qy, qz, ...joint_angles...]
+        # pelvis pos from XML: pos="0 0 0.75"
         self.mujoco_default_dof_pos = np.concatenate([
-            np.array([0, 0, 0.75]),
-            np.array([1, 0, 0, 0]),
-            np.array([-0.2, 0.0, 0.0, 0.4, -0.2, 0.0,  # left leg (6)
-                -0.2, 0.0, 0.0, 0.4, -0.2, 0.0,  # right leg (6)
-                0.0, 0.0, 0.0,  # waist (3)
-                0.0, 0.2, 0.0, 0.8, 0.0, 0.0, 0.0,  # left arm (7)
-                0.0, -0.2, 0.0, 0.8, 0.0, 0.0, 0.0,  # right arm (7)
-                0.0, 0.0, 0.0,  # neck (3)
-                ])
+            np.array([0, 0, 0.75]),  # root position from XML pelvis pos
+            np.array([1, 0, 0, 0]),  # quaternion (w, x, y, z)
+            np.array([
+                # left leg (6)
+                -0.2, 0.0, 0.0, 0.4, -0.2, 0.0,
+                # right leg (6)
+                -0.2, 0.0, 0.0, 0.4, -0.2, 0.0,
+                # waist (3)
+                0.0, 0.0, 0.0,
+                # left arm (7) - shoulder_roll slightly inward for natural pose
+                0.0, 0.2, 0.0, 0.8, 0.0, 0.0, 0.0,
+                # right arm (7) - shoulder_roll slightly inward for natural pose
+                0.0, -0.2, 0.0, 0.8, 0.0, 0.0, 0.0,
+                # neck (3)
+                0.0, 0.0, 0.0,
+            ])
         ])
 
+        # Stiffness values aligned with taks_t1_mimic_distill_config.py control settings
+        # hip_yaw: 100, hip_roll: 100, hip_pitch: 100, knee: 150, ankle: 40
+        # waist: 150, shoulder: 40, elbow: 40, wrist: 20, neck: 20
         self.stiffness = np.array([
-                100, 100, 100, 150, 40, 40,  # left leg
-                100, 100, 100, 150, 40, 40,  # right leg
-                150, 150, 150,  # waist
-                40, 40, 40, 40, 20, 20, 20,  # left arm
-                40, 40, 40, 40, 20, 20, 20,  # right arm
-                20, 20, 20,  # neck
+                # left leg: hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll
+                100, 100, 100, 150, 40, 40,
+                # right leg: hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll
+                100, 100, 100, 150, 40, 40,
+                # waist: yaw, roll, pitch
+                150, 150, 150,
+                # left arm: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow, wrist_roll, wrist_yaw, wrist_pitch
+                40, 40, 40, 40, 20, 20, 20,
+                # right arm: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow, wrist_roll, wrist_yaw, wrist_pitch
+                40, 40, 40, 40, 20, 20, 20,
+                # neck: yaw, roll, pitch
+                20, 20, 20,
             ])
+        # Damping values aligned with taks_t1_mimic_distill_config.py control settings
+        # hip_yaw: 2, hip_roll: 2, hip_pitch: 2, knee: 4, ankle: 2
+        # waist: 4, shoulder: 5, elbow: 5, wrist: 2, neck: 2
         self.damping = np.array([
-                2, 2, 2, 4, 2, 2,  # left leg
-                2, 2, 2, 4, 2, 2,  # right leg
-                4, 4, 4,  # waist
-                5, 5, 5, 5, 2, 2, 2,  # left arm
-                5, 5, 5, 5, 2, 2, 2,  # right arm
-                2, 2, 2,  # neck
+                # left leg
+                2, 2, 2, 4, 2, 2,
+                # right leg
+                2, 2, 2, 4, 2, 2,
+                # waist
+                4, 4, 4,
+                # left arm
+                5, 5, 5, 5, 2, 2, 2,
+                # right arm
+                5, 5, 5, 5, 2, 2, 2,
+                # neck
+                2, 2, 2,
             ])
 
+        # Torque limits from XML actuatorfrcrange
+        # left/right leg: hip_pitch=120, hip_roll=97, hip_yaw=97, knee=120, ankle=27
+        # waist: all 97
+        # arm: shoulder/elbow=27, wrist=7
+        # neck: 3
         self.torque_limits = np.array([
-                120, 97, 97, 120, 27, 27,  # left leg
-                120, 97, 97, 120, 27, 27,  # right leg
-                97, 97, 97,  # waist
-                27, 27, 27, 27, 7, 7, 7,  # left arm
-                27, 27, 27, 27, 7, 7, 7,  # right arm
-                3, 3, 3,  # neck
+                # left leg: hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll
+                120, 97, 97, 120, 27, 27,
+                # right leg: hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll
+                120, 97, 97, 120, 27, 27,
+                # waist: yaw, roll, pitch
+                97, 97, 97,
+                # left arm: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow, wrist_roll, wrist_yaw, wrist_pitch
+                27, 27, 27, 27, 7, 7, 7,
+                # right arm: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow, wrist_roll, wrist_yaw, wrist_pitch
+                27, 27, 27, 27, 7, 7, 7,
+                # neck: yaw, roll, pitch
+                3, 3, 3,
             ])
 
+        # Action scale from taks_t1_mimic_distill_config.py: action_scale = 0.5
+        # Neck uses smaller scale (0.3) for finer control
         self.action_scale = np.array([
-                0.5, 0.5, 0.5, 0.5, 0.5, 0.5,  # left leg
-                0.5, 0.5, 0.5, 0.5, 0.5, 0.5,  # right leg
-                0.5, 0.5, 0.5,  # waist
-                0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,  # left arm
-                0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,  # right arm
-                0.3, 0.3, 0.3,  # neck
+                # left leg (6)
+                0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+                # right leg (6)
+                0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+                # waist (3)
+                0.5, 0.5, 0.5,
+                # left arm (7)
+                0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+                # right arm (7)
+                0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+                # neck (3) - smaller scale for finer control
+                0.3, 0.3, 0.3,
             ])
 
         self.ankle_idx = [4, 5, 10, 11]

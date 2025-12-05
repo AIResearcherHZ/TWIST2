@@ -220,8 +220,7 @@ class G1MimicCfg(HumanoidMimicCfg):
             
             ankle_dof_acc = -5e-8 * 2
             ankle_dof_vel = -1e-4 * 2
-            
-            # ankle_action = -0.02
+            idle_penalty = -0.001
 
         min_dist = 0.1
         max_dist = 0.4

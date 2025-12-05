@@ -36,8 +36,7 @@ class G1MimicStuFutureCfg(G1MimicPrivCfg):
         
         
         # FALCON-style curriculum force application (domain randomization)
-        # enable_force_curriculum = True  # Enable force disturbances during training
-        enable_force_curriculum = False  # Enable force disturbances during training
+        enable_force_curriculum = True  # Enable force disturbances during training
         
         class force_curriculum:
             # Force application settings
@@ -82,7 +81,7 @@ class G1MimicStuFutureCfg(G1MimicPrivCfg):
         # use_adaptive_pose_termination = Truee
         
         # Motion Domain Randomization - Enable for robustness
-        motion_dr_enabled = False
+        motion_dr_enabled = True
         root_position_noise = [0.01, 0.05]  # ±1-5cm noise range for root position
         root_orientation_noise = [0.1, 0.2]  # ±5.7-11.4° noise range for root orientation (in rad)
         root_velocity_noise = [0.05, 0.1]   # ±0.05-0.1 noise range for root velocity
@@ -94,39 +93,81 @@ class G1MimicStuFutureCfg(G1MimicPrivCfg):
         error_sampling_power = 5.0          # Power exponent for error-based probability calculation
         error_sampling_threshold = 0.15     # Threshold for max key body error normalization
     
+    class domain_rand(G1MimicPrivCfg.domain_rand):
+        domain_rand_general = True
+
+        randomize_gravity = (True and domain_rand_general)
+        gravity_rand_interval_s = 4
+        gravity_range = (-0.1, 0.1)
+
+        randomize_friction = (True and domain_rand_general)
+        friction_range = [0.1, 2.]
+
+        randomize_base_mass = (True and domain_rand_general)
+        added_mass_range = [-3., 3]
+
+        randomize_base_com = (True and domain_rand_general)
+        added_com_range = [-0.05, 0.05]
+
+        push_robots = (True and domain_rand_general)
+        push_interval_s = 4
+        max_push_vel_xy = 1.0
+
+        push_end_effector = (False and domain_rand_general)
+        push_end_effector_interval_s = 2
+        max_push_force_end_effector = 10.0
+
+        randomize_motor = (True and domain_rand_general)
+        motor_strength_range = [0.8, 1.2]
+
+        action_delay = (True and domain_rand_general)
+        action_buf_len = 8
+
+        # 动作噪声
+        action_noise = (True and domain_rand_general)
+        action_noise_std = 0.01
+
+        # 关节编码器噪声
+        encoder_noise = (True and domain_rand_general)
+        encoder_pos_noise_std = 0.005
+        encoder_vel_noise_std = 0.01
+        encoder_pos_bias_range = [-0.01, 0.01]
+        encoder_vel_bias_range = [-0.02, 0.02]
+
+        # IMU噪声和漂移
+        imu_noise = (True and domain_rand_general)
+        imu_ang_vel_noise_std = 0.02
+        imu_lin_acc_noise_std = 0.05
+        imu_ang_vel_bias_range = [-0.1, 0.1]
+        imu_lin_acc_bias_range = [-0.2, 0.2]
+        imu_bias_drift_std = 0.01
+
+        # 观测丢包
+        observation_dropout = (True and domain_rand_general)
+        observation_dropout_prob = 0.001
+        observation_dropout_mode = 'hold'
+
+        # 关节故障
+        joint_failure = (False and domain_rand_general)
+        joint_failure_prob = 0.0001
+        joint_failure_mode = 'weak'
+        joint_failure_weak_factor = 0.5
+
+        # 传感器延迟尖峰
+        sensor_latency_spike = (True and domain_rand_general)
+        sensor_latency_spike_prob = 0.001
+        sensor_latency_max_steps = 10
+
+        # 重力方向偏置
+        slope_randomization = (True and domain_rand_general)
+        gravity_bias_x_range = [-0.1, 0.1]
+        gravity_bias_y_range = [-0.1, 0.1]
+        gravity_bias_z_range = [-0.05, 0.05]
+
     class rewards(G1MimicPrivCfg.rewards):
-        class scales:      
-            # tracking_joint_dof = 2.0
-            # tracking_joint_vel = 0.4
-            # # tracking_root_translation_xy = 5.0
-            # tracking_root_translation_xy = 1.0
-            # tracking_root_translation_z = 0.5
-            # tracking_root_rotation = 1.0
-            # tracking_root_linear_vel = 1.0
-            # tracking_root_angular_vel = 1.0
-            # tracking_keybody_pos = 2.0
-            # # tracking_keybody_pos_global = 2.0
-            # alive = 0.5
-            
-            # feet_slip = -0.1
-            # feet_contact_forces = -5e-4      
-            # feet_stumble = -1.25
-            # feet_air_time = 5.0
-            
-            # dof_pos_limits = -5.0
-            # dof_torque_limits = -1.0
-            # dof_vel = -1e-4
-            # dof_acc = -5e-8
-            # action_rate = -0.01
-            # ang_vel_xy = -0.01            
-            # ankle_dof_acc = -5e-8 * 2
-            # ankle_dof_vel = -1e-4 * 2
-            
-            # 0628 version  
-            # tracking_joint_dof = 0.6
+        class scales:
             tracking_joint_dof = 2.0
             tracking_joint_vel = 0.2
-            # tracking_root_translation_xy = 1.0
             tracking_root_translation_z = 1.0
             tracking_root_rotation = 1.0
             tracking_root_linear_vel = 1.0
@@ -135,18 +176,22 @@ class G1MimicStuFutureCfg(G1MimicPrivCfg):
             tracking_keybody_pos_global = 2.0
             alive = 0.5
             feet_slip = -0.1
-            feet_contact_forces = -5e-4      
+            feet_contact_forces = -5e-4
             feet_stumble = -1.25
             dof_pos_limits = -5.0
             dof_torque_limits = -1.0
             dof_vel = -1e-4
             dof_acc = -5e-8
-            action_rate = -0.05
-            # action_rate = -0.01
+            action_rate = -0.1
             feet_air_time = 5.0
-            ang_vel_xy = -0.01            
+            ang_vel_xy = -0.02
             ankle_dof_acc = -5e-8 * 2
             ankle_dof_vel = -1e-4 * 2
+            idle_penalty = -0.001
+            # 未来动作一致性奖励（只在训练时生效）
+            future_action_consistency = 1.0
+            future_yaw_consistency = 0.6
+            turning_smoothness = -0.01
         
         
 

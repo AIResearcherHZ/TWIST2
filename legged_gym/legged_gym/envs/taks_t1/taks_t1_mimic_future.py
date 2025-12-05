@@ -239,13 +239,170 @@ class TaksT1MimicFuture(TaksT1MimicDistill):
         else:
             return priv_mimic_obs, mimic_obs
 
+    def reset_idx(self, env_ids):
+        super().reset_idx(env_ids)
+        if self.enable_force_curriculum:
+            self._update_force_curriculum(env_ids)
+
+    def _init_force_curriculum_components(self, cfg):
+        force_cfg = cfg.env.force_curriculum
+        self.force_apply_links = getattr(
+            force_cfg, 'force_apply_links',
+            ['left_wrist_pitch_link', 'right_wrist_pitch_link'])
+        self.force_apply_body_indices = []
+
+        for link_name in self.force_apply_links:
+            body_idx = self.gym.find_actor_rigid_body_handle(
+                self.envs[0], self.actor_handles[0], link_name)
+            if body_idx != -1:
+                self.force_apply_body_indices.append(body_idx)
+            else:
+                print(f"Warning: Force application link '{link_name}' "
+                      f"not found in robot model")
+
+        self.force_apply_body_indices = torch.tensor(
+            self.force_apply_body_indices, device=self.device, dtype=torch.long)
+
+        self.force_scale_curriculum = getattr(
+            force_cfg, 'force_scale_curriculum', True)
+        self.force_scale_initial_scale = getattr(
+            force_cfg, 'force_scale_initial_scale', 0.1)
+        self.force_scale_up_threshold = getattr(
+            force_cfg, 'force_scale_up_threshold', 210)
+        self.force_scale_down_threshold = getattr(
+            force_cfg, 'force_scale_down_threshold', 200)
+        self.force_scale_up = getattr(force_cfg, 'force_scale_up', 0.02)
+        self.force_scale_down = getattr(force_cfg, 'force_scale_down', 0.02)
+        self.force_scale_max = getattr(force_cfg, 'force_scale_max', 1.0)
+        self.force_scale_min = getattr(force_cfg, 'force_scale_min', 0.0)
+
+        self.apply_force_x_range = torch.tensor(
+            getattr(force_cfg, 'apply_force_x_range', [-40.0, 40.0]),
+            device=self.device)
+        self.apply_force_y_range = torch.tensor(
+            getattr(force_cfg, 'apply_force_y_range', [-40.0, 40.0]),
+            device=self.device)
+        self.apply_force_z_range = torch.tensor(
+            getattr(force_cfg, 'apply_force_z_range', [-50.0, 5.0]),
+            device=self.device)
+
+        self.zero_force_prob = getattr(
+            force_cfg, 'zero_force_prob', [0.25, 0.25, 0.25])
+        self.randomize_force_duration = getattr(
+            force_cfg, 'randomize_force_duration', [150, 250])
+
+        self.force_scale = torch.full(
+            (self.num_envs,), self.force_scale_initial_scale, device=self.device)
+        self.episode_length_counter = torch.zeros(
+            self.num_envs, device=self.device, dtype=torch.long)
+
+        self.applied_forces = torch.zeros(
+            (self.num_envs, len(self.force_apply_body_indices), 3),
+            device=self.device)
+        self.force_duration_counter = torch.zeros(
+            self.num_envs, device=self.device, dtype=torch.long)
+        self.force_duration_target = torch.randint(
+            self.randomize_force_duration[0],
+            self.randomize_force_duration[1] + 1,
+            (self.num_envs,), device=self.device)
+
+        print(f"Force curriculum initialized with "
+              f"{len(self.force_apply_body_indices)} force application points")
+
+    def _update_force_curriculum(self, env_ids):
+        pass
+
+    def _apply_motion_domain_randomization(self, root_pos, root_rot, root_vel,
+                                           root_ang_vel, dof_pos, dof_vel):
+        return root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel
+
+    # ==================== 未来动作一致性奖励 ====================
+    # 这些奖励只在训练时生效，不影响sim2sim/sim2real部署
+
+    def _reward_future_action_consistency(self):
+        """奖励当前动作与未来目标动作的一致性。
+        通过比较当前动作与未来帧目标动作的差异，鼓励平滑过渡。
+        这有助于减少转身时的惯量过大问题。
+        """
+        if not hasattr(self, '_cached_future_dof_pos'):
+            return torch.zeros(self.num_envs, device=self.device)
+
+        # 当前动作转换为目标关节位置
+        current_target_dof = (self.actions * self.cfg.control.action_scale +
+                              self.default_dof_pos_all)
+
+        # 与未来帧的目标关节位置比较
+        future_dof_pos = self._cached_future_dof_pos  # (num_envs, num_dof)
+        dof_diff = current_target_dof - future_dof_pos
+        dof_err = torch.sum(dof_diff ** 2, dim=-1)
+
+        return torch.exp(-0.5 * dof_err)
+
+    def _reward_future_yaw_consistency(self):
+        """奖励当前角速度与未来目标角速度的一致性。
+        特别关注yaw方向的角速度，减少转身惯量。
+        """
+        if not hasattr(self, '_cached_future_yaw_ang_vel'):
+            return torch.zeros(self.num_envs, device=self.device)
+
+        # 当前yaw角速度
+        current_yaw_ang_vel = self.base_ang_vel[:, 2]
+
+        # 未来目标yaw角速度
+        future_yaw_ang_vel = self._cached_future_yaw_ang_vel  # (num_envs,)
+
+        # 计算角速度差异
+        yaw_diff = current_yaw_ang_vel - future_yaw_ang_vel
+        yaw_err = yaw_diff ** 2
+
+        return torch.exp(-2.0 * yaw_err)
+
+    def _reward_turning_smoothness(self):
+        """惩罚转身时的角速度突变。
+        通过比较当前角速度与上一帧角速度的差异来实现。
+        """
+        if not hasattr(self, '_last_base_ang_vel'):
+            self._last_base_ang_vel = self.base_ang_vel.clone()
+            return torch.zeros(self.num_envs, device=self.device)
+
+        # 角速度变化率（角加速度）
+        ang_vel_change = self.base_ang_vel - self._last_base_ang_vel
+
+        # 特别关注yaw方向的突变
+        yaw_acc = ang_vel_change[:, 2] ** 2
+
+        # 更新上一帧角速度
+        self._last_base_ang_vel = self.base_ang_vel.clone()
+
+        return yaw_acc
+
+    def _cache_future_motion_data(self, motion_data):
+        """缓存未来动作数据用于奖励计算。
+        在compute_observations中调用。
+        """
+        if motion_data['num_future_steps'] == 0:
+            return
+
+        num_priv_steps = motion_data['num_priv_steps']
+
+        # 缓存未来帧的目标关节位置（取第一个未来帧）
+        self._cached_future_dof_pos = motion_data['dof_pos'][:, num_priv_steps]
+
+        # 缓存未来帧的yaw角速度
+        future_ang_vel_local = motion_data['root_ang_vel_local'][:, num_priv_steps]
+        self._cached_future_yaw_ang_vel = future_ang_vel_local[:, 2]
+
     def compute_observations(self):
+        """Override to cache future motion data for reward computation."""
         imu_obs = torch.stack((self.roll, self.pitch), dim=1)
         self.base_yaw_quat = quat_from_euler_xyz(
             0*self.yaw, 0*self.yaw, self.yaw)
 
         if self.obs_type == 'student_future':
             priv_mimic_obs, mimic_obs, future_obs = self._get_mimic_obs()
+            # 缓存未来动作数据用于奖励计算
+            motion_data = self._get_unified_motion_data()
+            self._cache_future_motion_data(motion_data)
         else:
             priv_mimic_obs, mimic_obs = self._get_mimic_obs()
             future_obs = None
@@ -358,79 +515,7 @@ class TaksT1MimicFuture(TaksT1MimicDistill):
                     self.obs_history_buf[continue_indices, -1] = \
                         obs_buf[continue_indices]
 
-    def reset_idx(self, env_ids):
-        super().reset_idx(env_ids)
-        if self.enable_force_curriculum:
-            self._update_force_curriculum(env_ids)
-
-    def _init_force_curriculum_components(self, cfg):
-        force_cfg = cfg.env.force_curriculum
-        self.force_apply_links = getattr(
-            force_cfg, 'force_apply_links',
-            ['left_wrist_pitch_link', 'right_wrist_pitch_link'])
-        self.force_apply_body_indices = []
-
-        for link_name in self.force_apply_links:
-            body_idx = self.gym.find_actor_rigid_body_handle(
-                self.envs[0], self.actor_handles[0], link_name)
-            if body_idx != -1:
-                self.force_apply_body_indices.append(body_idx)
-            else:
-                print(f"Warning: Force application link '{link_name}' "
-                      f"not found in robot model")
-
-        self.force_apply_body_indices = torch.tensor(
-            self.force_apply_body_indices, device=self.device, dtype=torch.long)
-
-        self.force_scale_curriculum = getattr(
-            force_cfg, 'force_scale_curriculum', True)
-        self.force_scale_initial_scale = getattr(
-            force_cfg, 'force_scale_initial_scale', 0.1)
-        self.force_scale_up_threshold = getattr(
-            force_cfg, 'force_scale_up_threshold', 210)
-        self.force_scale_down_threshold = getattr(
-            force_cfg, 'force_scale_down_threshold', 200)
-        self.force_scale_up = getattr(force_cfg, 'force_scale_up', 0.02)
-        self.force_scale_down = getattr(force_cfg, 'force_scale_down', 0.02)
-        self.force_scale_max = getattr(force_cfg, 'force_scale_max', 1.0)
-        self.force_scale_min = getattr(force_cfg, 'force_scale_min', 0.0)
-
-        self.apply_force_x_range = torch.tensor(
-            getattr(force_cfg, 'apply_force_x_range', [-40.0, 40.0]),
-            device=self.device)
-        self.apply_force_y_range = torch.tensor(
-            getattr(force_cfg, 'apply_force_y_range', [-40.0, 40.0]),
-            device=self.device)
-        self.apply_force_z_range = torch.tensor(
-            getattr(force_cfg, 'apply_force_z_range', [-50.0, 5.0]),
-            device=self.device)
-
-        self.zero_force_prob = getattr(
-            force_cfg, 'zero_force_prob', [0.25, 0.25, 0.25])
-        self.randomize_force_duration = getattr(
-            force_cfg, 'randomize_force_duration', [150, 250])
-
-        self.force_scale = torch.full(
-            (self.num_envs,), self.force_scale_initial_scale, device=self.device)
-        self.episode_length_counter = torch.zeros(
-            self.num_envs, device=self.device, dtype=torch.long)
-
-        self.applied_forces = torch.zeros(
-            (self.num_envs, len(self.force_apply_body_indices), 3),
-            device=self.device)
-        self.force_duration_counter = torch.zeros(
-            self.num_envs, device=self.device, dtype=torch.long)
-        self.force_duration_target = torch.randint(
-            self.randomize_force_duration[0],
-            self.randomize_force_duration[1] + 1,
-            (self.num_envs,), device=self.device)
-
-        print(f"Force curriculum initialized with "
-              f"{len(self.force_apply_body_indices)} force application points")
-
-    def _update_force_curriculum(self, env_ids):
-        pass
-
-    def _apply_motion_domain_randomization(self, root_pos, root_rot, root_vel,
-                                           root_ang_vel, dof_pos, dof_vel):
-        return root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel
+    def _reward_idle_penalty(self):
+        """Penalize joint movement when close to target."""
+        joint_vel_magnitude = torch.sum(torch.square(self.dof_vel), dim=1)
+        return joint_vel_magnitude

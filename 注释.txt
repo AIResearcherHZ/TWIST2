@@ -25,13 +25,13 @@ bash run_motion_server.sh
                                     训练
 ================================================================================
 # 训练
-bash train.sh 1204_twist2 cuda:0
+bash train.sh 1205_twist2 cuda:0
 
 # 评估
-bash eval.sh 1204_twist2 cuda:0
+bash eval.sh 1205_twist2 cuda:0
 
 # ONNX转换
-bash to_onnx.sh legged_gym/logs/g1_stu_future/1204_twist2/model_10000.pt
+bash to_onnx.sh g1 legged_gym/logs/g1_stu_future/1204_twist2/model_10000.pt
 
 # SIM2SIM
 bash sim2sim.sh legged_gym/logs/g1_stu_future/1204_twist2/model_10000.onnx

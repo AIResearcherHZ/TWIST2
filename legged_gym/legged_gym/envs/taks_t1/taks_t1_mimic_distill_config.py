@@ -65,7 +65,7 @@ class TaksT1MimicPrivCfg(HumanoidMimicCfg):
         horizontal_scale = 0.1
     
     class init_state(HumanoidMimicCfg.init_state):
-        pos = [0, 0, 1.0]
+        pos = [0, 0, 0.75]
         default_joint_angles = {
             'left_hip_pitch_joint': -0.2,
             'left_hip_roll_joint': 0.0,
@@ -196,6 +196,7 @@ class TaksT1MimicPrivCfg(HumanoidMimicCfg):
             ang_vel_xy = -0.01
             ankle_dof_acc = -5e-8 * 2
             ankle_dof_vel = -1e-4 * 2
+            idle_penalty = -0.001
 
         min_dist = 0.1
         max_dist = 0.4
