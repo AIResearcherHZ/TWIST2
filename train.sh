@@ -21,7 +21,7 @@ proj_name="${robot_name}_stu_future"
 
 python train.py --task "${task_name}" \
                 --proj_name "${proj_name}" \
-                --num_envs 8196 \
+                --num_envs 10240 \
                 --exptid "${exptid}" \
                 --device "${device}" \
                 --teacher_exptid "None" \
