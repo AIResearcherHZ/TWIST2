@@ -430,7 +430,14 @@ class LeggedRobot(BaseTask):
                 self.dof_pos_limits[i, 0] = m - 0.5 * r * self.cfg.rewards.soft_dof_pos_limit
                 self.dof_pos_limits[i, 1] = m + 0.5 * r * self.cfg.rewards.soft_dof_pos_limit
                 if hasattr(self.cfg.asset, "dof_armature") and self.cfg.asset.dof_armature:
-                    props["armature"][i] = self.cfg.asset.dof_armature[i]
+                    base_armature = self.cfg.asset.dof_armature[i]
+                    # 惯量随机化
+                    if hasattr(self.cfg.domain_rand, "randomize_armature") and self.cfg.domain_rand.randomize_armature:
+                        armature_range = self.cfg.domain_rand.armature_range
+                        armature_scale = np.random.uniform(armature_range[0], armature_range[1])
+                        props["armature"][i] = base_armature * armature_scale
+                    else:
+                        props["armature"][i] = base_armature
                    
         return props
 
@@ -448,6 +455,15 @@ class LeggedRobot(BaseTask):
             props[self.torso_idx].com += gymapi.Vec3(*rand_com)
         else:
             rand_com = np.zeros(3)
+        # 刚体惯性随机化
+        if hasattr(self.cfg.domain_rand, "randomize_link_inertia") and self.cfg.domain_rand.randomize_link_inertia:
+            inertia_range = self.cfg.domain_rand.link_inertia_range
+            for i in range(len(props)):
+                inertia_scale = np.random.uniform(inertia_range[0], inertia_range[1])
+                # 缩放惯性张量的对角元素
+                props[i].inertia.x.x *= inertia_scale
+                props[i].inertia.y.y *= inertia_scale
+                props[i].inertia.z.z *= inertia_scale
         mass_params = np.concatenate([rand_mass, rand_com])
         return props, mass_params
     

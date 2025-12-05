@@ -118,7 +118,7 @@ class G1MimicStuFutureCfg(G1MimicPrivCfg):
         max_push_force_end_effector = 10.0
 
         randomize_motor = (True and domain_rand_general)
-        motor_strength_range = [0.8, 1.2]
+        motor_strength_range = [0.5, 2.0]
 
         action_delay = (True and domain_rand_general)
         action_buf_len = 8
@@ -163,6 +163,14 @@ class G1MimicStuFutureCfg(G1MimicPrivCfg):
         gravity_bias_x_range = [-0.1, 0.1]
         gravity_bias_y_range = [-0.1, 0.1]
         gravity_bias_z_range = [-0.05, 0.05]
+        
+        # 惯量随机化 - 模拟电机转子惯量不确定性
+        randomize_armature = (True and domain_rand_general)
+        armature_range = [0.5, 2.0]  # 惯量缩放范围
+        
+        # 刚体惯性随机化 - 模拟连杆惯性不确定性
+        randomize_link_inertia = (True and domain_rand_general)
+        link_inertia_range = [0.5, 2.0]  # 刚体惯性缩放范围
 
     class rewards(G1MimicPrivCfg.rewards):
         class scales:
@@ -181,16 +189,16 @@ class G1MimicStuFutureCfg(G1MimicPrivCfg):
             dof_pos_limits = -5.0
             dof_torque_limits = -1.0
             dof_vel = -1e-4
-            dof_acc = -5e-8
+            dof_acc = -1e-7
             action_rate = -0.1
             feet_air_time = 5.0
             ang_vel_xy = -0.02
-            ankle_dof_acc = -5e-8 * 2
+            ankle_dof_acc = -1e-7 * 2
             ankle_dof_vel = -1e-4 * 2
             idle_penalty = -0.001
             # 未来动作一致性奖励（只在训练时生效）
-            future_action_consistency = 1.0
-            future_yaw_consistency = 0.6
+            future_action_consistency = 0.2
+            future_yaw_consistency = 0.1
             turning_smoothness = -0.01
         
         

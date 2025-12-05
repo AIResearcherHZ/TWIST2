@@ -194,14 +194,14 @@ class TaksT1MimicCfg(HumanoidMimicCfg):
             dof_torque_limits = -1.0
             
             dof_vel = -1e-4
-            dof_acc = -5e-8
+            dof_acc = -1e-7
             action_rate = -0.01
             
             feet_air_time = 5.0
             
             ang_vel_xy = -0.01
             
-            ankle_dof_acc = -5e-8 * 2
+            ankle_dof_acc = -1e-7 * 2
             ankle_dof_vel = -1e-4 * 2
             idle_penalty = -0.001
 
@@ -245,7 +245,7 @@ class TaksT1MimicCfg(HumanoidMimicCfg):
         max_push_force_end_effector = 20.0
 
         randomize_motor = (True and domain_rand_general)
-        motor_strength_range = [0.8, 1.2]
+        motor_strength_range = [0.5, 2.0]
 
         action_delay = (True and domain_rand_general)
         action_buf_len = 8
@@ -291,6 +291,14 @@ class TaksT1MimicCfg(HumanoidMimicCfg):
         gravity_bias_x_range = [-0.1, 0.1]  # x方向重力偏置 (m/s^2)
         gravity_bias_y_range = [-0.1, 0.1]  # y方向重力偏置 (m/s^2)
         gravity_bias_z_range = [-0.05, 0.05]  # z方向重力偏置 (m/s^2)
+        
+        # 惯量随机化 - 模拟电机转子惯量不确定性
+        randomize_armature = (True and domain_rand_general)
+        armature_range = [0.5, 2.0]  # 惯量缩放范围
+        
+        # 刚体惯性随机化 - 模拟连杆惯性不确定性
+        randomize_link_inertia = (True and domain_rand_general)
+        link_inertia_range = [0.5, 2.0]  # 刚体惯性缩放范围
     
     class noise(HumanoidMimicCfg.noise):
         add_noise = True
