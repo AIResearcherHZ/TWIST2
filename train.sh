@@ -21,9 +21,9 @@ proj_name="${robot_name}_stu_future"
 
 python train.py --task "${task_name}" \
                 --proj_name "${proj_name}" \
-                --num_envs 10240 \
+                --num_envs 8196 \
                 --exptid "${exptid}" \
                 --device "${device}" \
                 --teacher_exptid "None" \
-                # --debug \  # 调试模式（可视化）
-                --resume \
+                --resume
+                # --debug  # 调试模式（可视化）
