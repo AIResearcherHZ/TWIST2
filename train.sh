@@ -4,10 +4,10 @@
 
 # bash train.sh 1103_twist2 cuda:0
 
-# export LD_LIBRARY_PATH=/opt/conda/envs/twist2/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/opt/conda/envs/twist2/lib:$LD_LIBRARY_PATH
 
 # Set LD_LIBRARY_PATH for isaacgym
-export LD_LIBRARY_PATH=/home/xhz/anaconda3/envs/twist2/lib:$LD_LIBRARY_PATH
+# export LD_LIBRARY_PATH=/home/xhz/anaconda3/envs/twist2/lib:$LD_LIBRARY_PATH
 
 
 cd legged_gym/legged_gym/scripts
