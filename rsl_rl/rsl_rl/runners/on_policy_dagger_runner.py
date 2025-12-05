@@ -30,6 +30,7 @@
 
 import time
 import os
+import signal
 from collections import deque
 import statistics
 from rich import print
@@ -192,6 +193,29 @@ class OnPolicyDaggerRunner:
         self.tot_time = 0
         self.current_learning_iteration = 0
         
+        # 中断处理相关
+        self._interrupted = False
+        self._last_saved_iteration = -1
+        self._setup_signal_handlers()
+
+    def _setup_signal_handlers(self):
+        """设置信号处理器，在中断时保存checkpoint"""
+        def signal_handler(signum, frame):
+            print("\n" + "=" * 60)
+            print("[WARNING] 检测到中断信号 (Ctrl+C)，正在保存checkpoint...")
+            print("=" * 60)
+            self._interrupted = True
+        
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+    
+    def _save_on_interrupt(self, current_it):
+        """中断时保存checkpoint"""
+        if self.log_dir is not None and current_it != self._last_saved_iteration:
+            save_path = os.path.join(self.log_dir, 'model_{}.pt'.format(current_it))
+            self.save(save_path)
+            print(f"[INFO] Checkpoint已保存到: {save_path}")
+            self._last_saved_iteration = current_it
 
     def learn_RL(self, num_learning_iterations, init_at_random_ep_len=False):
         mean_value_loss = 0.
@@ -300,18 +324,31 @@ class OnPolicyDaggerRunner:
             learn_time = stop - start
             if self.log_dir is not None:
                 self.log(locals())
+            
+            # 更新当前迭代次数（用于中断保存）
+            self.current_learning_iteration = it
+            
+            # 检查是否被中断
+            if self._interrupted:
+                self._save_on_interrupt(it)
+                print(f"[INFO] 训练在第 {it} 次迭代时被中断")
+                return
+            
             if it < 2500:
                 if it % self.save_interval == 0:
                     self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
+                    self._last_saved_iteration = it
             elif it <= 10000:
                 if it % (2*self.save_interval) == 0:
                     self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
+                    self._last_saved_iteration = it
             else:
                 if it % (5*self.save_interval) == 0:
                     self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
+                    self._last_saved_iteration = it
             ep_infos.clear()
         
-        # self.current_learning_iteration += num_learning_iterations
+        # 正常结束时保存
         self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(self.current_learning_iteration)))
     
     def _need_normalizer_update(self, iterations, update_iterations):
