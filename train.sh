@@ -7,7 +7,7 @@
 export LD_LIBRARY_PATH=/opt/conda/envs/twist2/lib:$LD_LIBRARY_PATH
 
 # Set LD_LIBRARY_PATH for isaacgym
-# export LD_LIBRARY_PATH=/home/xhz/anaconda3/envs/twist2/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/home/xhz/anaconda3/envs/twist2/lib:$LD_LIBRARY_PATH
 
 
 cd legged_gym/legged_gym/scripts
@@ -25,5 +25,5 @@ python train.py --task "${task_name}" \
                 --exptid "${exptid}" \
                 --device "${device}" \
                 --teacher_exptid "None" \
-                --resume
-                # --debug  # 调试模式（可视化）
+                --resume \
+                --debug  # 调试模式（可视化）

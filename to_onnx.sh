@@ -24,7 +24,7 @@ ckpt_path_abs="$(cd "$CALL_DIR" && realpath "$ckpt_path")"
 
 # Run the correct ONNX conversion script based on robot type
 if [ "$robot_type" = "g1" ]; then
-    python save_onnx.py --ckpt_path "${ckpt_path_abs}"
+    python save_onnx_g1.py --ckpt_path "${ckpt_path_abs}"
 elif [ "$robot_type" = "taks_t1" ]; then
     python save_onnx_taks_t1.py --ckpt_path "${ckpt_path_abs}"
 else
