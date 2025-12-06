@@ -26,7 +26,9 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
                            (TaksT1MimicPrivCfg.env.history_len + 1) +
                            n_future_obs)
 
-        enable_force_curriculum = True
+        # FALCON-style curriculum force application (domain randomization)
+        # Set to None to completely disable force curriculum
+        enable_force_curriculum = True  # Set to None/False to disable
 
         class force_curriculum:
             force_apply_links = ['left_wrist_pitch_link',
@@ -52,10 +54,12 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
 
     class motion(TaksT1MimicPrivCfg.motion):
         motion_file = f"{LEGGED_GYM_ROOT_DIR}/motion_data_configs/taks_t1_demo.yaml"
-        motion_curriculum = True
+        # Set to None to completely disable motion curriculum
+        motion_curriculum = True  # Set to None/False to disable
         motion_curriculum_gamma = 0.01
         motion_decompose = False
-        motion_dr_enabled = True
+        # Set to None to completely disable motion domain randomization
+        motion_dr_enabled = True  # Set to None/False to disable
         root_position_noise = [0.01, 0.05]
         root_orientation_noise = [0.1, 0.2]
         root_velocity_noise = [0.05, 0.1]
@@ -66,7 +70,9 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
         error_sampling_threshold = 0.15
 
     class domain_rand(TaksT1MimicPrivCfg.domain_rand):
-        domain_rand_general = True
+        # Master switch for all domain randomization
+        # Set to None to completely disable all domain randomization
+        domain_rand_general = True  # Set to None/False to disable all
 
         randomize_gravity = (True and domain_rand_general)
         gravity_rand_interval_s = 4
@@ -145,33 +151,35 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
         link_inertia_range = [0.5, 2.0]  # 刚体惯性缩放范围
 
     class rewards(TaksT1MimicPrivCfg.rewards):
+        # All reward scales can be set to None to completely disable that reward
+        # Set any scale to None to skip computing that reward entirely
         class scales:
-            tracking_joint_dof = 2.0
-            tracking_joint_vel = 0.2
-            tracking_root_translation_z = 1.0
-            tracking_root_rotation = 1.0
-            tracking_root_linear_vel = 1.0
-            tracking_root_angular_vel = 1.0
-            tracking_keybody_pos = 2.0
-            tracking_keybody_pos_global = 2.0
-            alive = 0.5
-            feet_slip = -0.1
-            feet_contact_forces = -5e-4
-            feet_stumble = -1.25
-            dof_pos_limits = -5.0
-            dof_torque_limits = -1.0
-            dof_vel = -1e-4
-            dof_acc = -1e-7
-            action_rate = -0.1
-            feet_air_time = 5.0
-            ang_vel_xy = -0.02
-            ankle_dof_acc = -1e-7 * 2
-            ankle_dof_vel = -1e-4 * 2
-            # 未来动作一致性奖励（只在训练时生效）
-            idle_penalty = -0.001
-            future_action_consistency = 0.2
-            future_yaw_consistency = 0.1
-            turning_smoothness = -0.01
+            tracking_joint_dof = 2.0  # Set to None to disable
+            tracking_joint_vel = 0.2  # Set to None to disable
+            tracking_root_translation_z = 1.0  # Set to None to disable
+            tracking_root_rotation = 1.0  # Set to None to disable
+            tracking_root_linear_vel = 1.0  # Set to None to disable
+            tracking_root_angular_vel = 1.0  # Set to None to disable
+            tracking_keybody_pos = 2.0  # Set to None to disable
+            tracking_keybody_pos_global = 2.0  # Set to None to disable
+            alive = 0.5  # Set to None to disable
+            feet_slip = -0.1  # Set to None to disable
+            feet_contact_forces = -5e-4  # Set to None to disable
+            feet_stumble = -1.25  # Set to None to disable
+            dof_pos_limits = -5.0  # Set to None to disable
+            dof_torque_limits = -1.0  # Set to None to disable
+            dof_vel = -1e-4  # Set to None to disable
+            dof_acc = -1e-7  # Set to None to disable
+            action_rate = -0.1  # Set to None to disable
+            feet_air_time = 5.0  # Set to None to disable
+            ang_vel_xy = -0.02  # Set to None to disable
+            ankle_dof_acc = -1e-7 * 2  # Set to None to disable
+            ankle_dof_vel = -1e-4 * 2  # Set to None to disable
+            # 未来动作一致性奖励（只在训练时生效）- Set to None to disable
+            idle_penalty = -0.001  # Set to None to disable
+            future_action_consistency = 0.2  # Set to None to disable
+            future_yaw_consistency = 0.1  # Set to None to disable
+            turning_smoothness = -0.01  # Set to None to disable
 
 
 class TaksT1MimicStuFutureCfgDAgger(TaksT1MimicStuFutureCfg):

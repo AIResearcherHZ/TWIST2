@@ -36,7 +36,8 @@ class G1MimicStuFutureCfg(G1MimicPrivCfg):
         
         
         # FALCON-style curriculum force application (domain randomization)
-        enable_force_curriculum = True  # Enable force disturbances during training
+        # Set to None to completely disable force curriculum
+        enable_force_curriculum = True  # Enable force disturbances during training, set to None/False to disable
         
         class force_curriculum:
             # Force application settings
@@ -74,14 +75,16 @@ class G1MimicStuFutureCfg(G1MimicPrivCfg):
         motion_file = f"{LEGGED_GYM_ROOT_DIR}/motion_data_configs/g1_demo.yaml"
         
         # Ensure motion curriculum is enabled for difficulty adaptation
-        motion_curriculum = True
+        # Set to None to completely disable motion curriculum
+        motion_curriculum = True  # Set to None/False to disable
         motion_curriculum_gamma = 0.01
         motion_decompose = False
 
         # use_adaptive_pose_termination = Truee
         
         # Motion Domain Randomization - Enable for robustness
-        motion_dr_enabled = True
+        # Set to None to completely disable motion domain randomization
+        motion_dr_enabled = True  # Set to None/False to disable
         root_position_noise = [0.01, 0.05]  # ±1-5cm noise range for root position
         root_orientation_noise = [0.1, 0.2]  # ±5.7-11.4° noise range for root orientation (in rad)
         root_velocity_noise = [0.05, 0.1]   # ±0.05-0.1 noise range for root velocity
@@ -94,7 +97,9 @@ class G1MimicStuFutureCfg(G1MimicPrivCfg):
         error_sampling_threshold = 0.15     # Threshold for max key body error normalization
     
     class domain_rand(G1MimicPrivCfg.domain_rand):
-        domain_rand_general = True
+        # Master switch for all domain randomization
+        # Set to None to completely disable all domain randomization
+        domain_rand_general = True  # Set to None/False to disable all
 
         randomize_gravity = (True and domain_rand_general)
         gravity_rand_interval_s = 4
@@ -122,47 +127,48 @@ class G1MimicStuFutureCfg(G1MimicPrivCfg):
 
         action_delay = (True and domain_rand_general)
         action_buf_len = 8
-
-        # 动作噪声
+        
+        # ==================== 新增鲁棒性随机化 ====================
+        # 动作噪声 - 模拟控制信号不完美（量化误差、通讯抖动）
         action_noise = (True and domain_rand_general)
         action_noise_std = 0.01
-
-        # 关节编码器噪声
+        
+        # 关节编码器噪声 - 模拟编码器测量误差和零点偏移
         encoder_noise = (True and domain_rand_general)
-        encoder_pos_noise_std = 0.005
-        encoder_vel_noise_std = 0.01
-        encoder_pos_bias_range = [-0.01, 0.01]
-        encoder_vel_bias_range = [-0.02, 0.02]
-
-        # IMU噪声和漂移
+        encoder_pos_noise_std = 0.005  # 位置噪声标准差 (rad)
+        encoder_vel_noise_std = 0.01   # 速度噪声标准差 (rad/s)
+        encoder_pos_bias_range = [-0.01, 0.01]  # 位置偏置范围 (rad)
+        encoder_vel_bias_range = [-0.02, 0.02]  # 速度偏置范围 (rad/s)
+        
+        # IMU噪声和漂移 - 模拟真实IMU的测量特性
         imu_noise = (True and domain_rand_general)
-        imu_ang_vel_noise_std = 0.02
-        imu_lin_acc_noise_std = 0.05
+        imu_ang_vel_noise_std = 0.02  # 角速度噪声 (rad/s)
+        imu_lin_acc_noise_std = 0.05  # 线加速度噪声 (m/s^2)
         imu_ang_vel_bias_range = [-0.1, 0.1]
         imu_lin_acc_bias_range = [-0.2, 0.2]
-        imu_bias_drift_std = 0.01
-
-        # 观测丢包
+        imu_bias_drift_std = 0.01  # 偏置漂移
+        
+        # 观测丢包 - 模拟传感器偶发失效
         observation_dropout = (True and domain_rand_general)
-        observation_dropout_prob = 0.001
-        observation_dropout_mode = 'hold'
-
-        # 关节故障
-        joint_failure = (False and domain_rand_general)
-        joint_failure_prob = 0.0001
-        joint_failure_mode = 'weak'
-        joint_failure_weak_factor = 0.5
-
-        # 传感器延迟尖峰
+        observation_dropout_prob = 0.001  # 每个维度丢包概率 0.1%
+        observation_dropout_mode = 'hold'  # 丢包时保持上一帧值 ('hold' or 'zero')
+        
+        # 关节故障 - 模拟电机故障（极低概率）
+        joint_failure = (False and domain_rand_general)  # 默认关闭，太激进
+        joint_failure_prob = 0.0001  # 每个关节失效概率 0.01%
+        joint_failure_mode = 'weak'  # 弱化模式（扭矩衰减）
+        joint_failure_weak_factor = 0.5  # 衰减因子
+        
+        # 传感器延迟尖峰 - 模拟偶发的通讯阻塞
         sensor_latency_spike = (True and domain_rand_general)
-        sensor_latency_spike_prob = 0.001
-        sensor_latency_max_steps = 10
-
-        # 重力方向偏置
+        sensor_latency_spike_prob = 0.001  # 0.1%概率发生延迟尖峰
+        sensor_latency_max_steps = 10  # 最大延迟10步
+        
+        # 重力方向偏置 - 模拟基座倾斜/坡度
         slope_randomization = (True and domain_rand_general)
-        gravity_bias_x_range = [-0.1, 0.1]
-        gravity_bias_y_range = [-0.1, 0.1]
-        gravity_bias_z_range = [-0.05, 0.05]
+        gravity_bias_x_range = [-0.1, 0.1]  # x方向重力偏置 (m/s^2)
+        gravity_bias_y_range = [-0.1, 0.1]  # y方向重力偏置 (m/s^2)
+        gravity_bias_z_range = [-0.05, 0.05]  # z方向重力偏置 (m/s^2)
         
         # 惯量随机化 - 模拟电机转子惯量不确定性
         randomize_armature = (True and domain_rand_general)
@@ -173,33 +179,35 @@ class G1MimicStuFutureCfg(G1MimicPrivCfg):
         link_inertia_range = [0.5, 2.0]  # 刚体惯性缩放范围
 
     class rewards(G1MimicPrivCfg.rewards):
+        # All reward scales can be set to None to completely disable that reward
+        # Set any scale to None to skip computing that reward entirely
         class scales:
-            tracking_joint_dof = 2.0
-            tracking_joint_vel = 0.2
-            tracking_root_translation_z = 1.0
-            tracking_root_rotation = 1.0
-            tracking_root_linear_vel = 1.0
-            tracking_root_angular_vel = 1.0
-            tracking_keybody_pos = 2.0
-            tracking_keybody_pos_global = 2.0
-            alive = 0.5
-            feet_slip = -0.1
-            feet_contact_forces = -5e-4
-            feet_stumble = -1.25
-            dof_pos_limits = -5.0
-            dof_torque_limits = -1.0
-            dof_vel = -1e-4
-            dof_acc = -1e-7
-            action_rate = -0.1
-            feet_air_time = 5.0
-            ang_vel_xy = -0.02
-            ankle_dof_acc = -1e-7 * 2
-            ankle_dof_vel = -1e-4 * 2
-            # 未来动作一致性奖励（只在训练时生效）
-            idle_penalty = -0.001
-            future_action_consistency = 0.2
-            future_yaw_consistency = 0.1
-            turning_smoothness = -0.01
+            tracking_joint_dof = 2.0  # Set to None to disable
+            tracking_joint_vel = 0.2  # Set to None to disable
+            tracking_root_translation_z = 1.0  # Set to None to disable
+            tracking_root_rotation = 1.0  # Set to None to disable
+            tracking_root_linear_vel = 1.0  # Set to None to disable
+            tracking_root_angular_vel = 1.0  # Set to None to disable
+            tracking_keybody_pos = 2.0  # Set to None to disable
+            tracking_keybody_pos_global = 2.0  # Set to None to disable
+            alive = 0.5  # Set to None to disable
+            feet_slip = -0.1  # Set to None to disable
+            feet_contact_forces = -5e-4  # Set to None to disable
+            feet_stumble = -1.25  # Set to None to disable
+            dof_pos_limits = -5.0  # Set to None to disable
+            dof_torque_limits = -1.0  # Set to None to disable
+            dof_vel = -1e-4  # Set to None to disable
+            dof_acc = -1e-7  # Set to None to disable
+            action_rate = -0.1  # Set to None to disable
+            feet_air_time = 5.0  # Set to None to disable
+            ang_vel_xy = -0.02  # Set to None to disable
+            ankle_dof_acc = -1e-7 * 2  # Set to None to disable
+            ankle_dof_vel = -1e-4 * 2  # Set to None to disable
+            # 未来动作一致性奖励（只在训练时生效）- Set to None to disable
+            idle_penalty = -0.001  # Set to None to disable
+            future_action_consistency = 0.2  # Set to None to disable
+            future_yaw_consistency = 0.1  # Set to None to disable
+            turning_smoothness = -0.01  # Set to None to disable
         
         
 

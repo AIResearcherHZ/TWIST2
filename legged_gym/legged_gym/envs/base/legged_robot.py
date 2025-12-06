@@ -992,6 +992,8 @@ class LeggedRobot(BaseTask):
         self.obs_scales = self.cfg.normalization.obs_scales
         self.reward_scales = class_to_dict(self.cfg.rewards.scales)
         reward_norm_factor = 1#np.sum(list(self.reward_scales.values()))
+        # Filter out None values - rewards set to None are disabled
+        self.reward_scales = {k: v for k, v in self.reward_scales.items() if v is not None}
         for rew in self.reward_scales:
             self.reward_scales[rew] = self.reward_scales[rew] / reward_norm_factor
         self.command_ranges = class_to_dict(self.cfg.commands.ranges)

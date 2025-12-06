@@ -20,8 +20,9 @@ class TaksT1MimicFuture(TaksT1MimicDistill):
         self.future_cfg = cfg.env
         self.evaluation_mode = getattr(cfg.env, 'evaluation_mode', False)
         self.force_full_masking = getattr(cfg.env, 'force_full_masking', False)
-        self.enable_force_curriculum = getattr(
-            cfg.env, 'enable_force_curriculum', False)
+        # Support None value to completely disable force curriculum
+        _enable_force = getattr(cfg.env, 'enable_force_curriculum', False)
+        self.enable_force_curriculum = bool(_enable_force) if _enable_force is not None else False
 
         if self.enable_force_curriculum:
             self.force_scale_curriculum = True
@@ -58,6 +59,7 @@ class TaksT1MimicFuture(TaksT1MimicDistill):
             self.body_error_history = []
             print("Error aware sampling logging initialized")
 
+        # Only initialize if enable_force_curriculum is True (not None or False)
         if self.enable_force_curriculum:
             self._init_force_curriculum_components(cfg)
             force_links = getattr(
@@ -65,6 +67,8 @@ class TaksT1MimicFuture(TaksT1MimicDistill):
                 ['left_wrist_pitch_link', 'right_wrist_pitch_link'])
             print(f"Force curriculum enabled with force application to "
                   f"{len(force_links)} links: {force_links}")
+        else:
+            print("Force curriculum disabled (enable_force_curriculum is None or False)")
 
     def _get_unified_motion_data(self):
         if (self.obs_type == 'student_future' and

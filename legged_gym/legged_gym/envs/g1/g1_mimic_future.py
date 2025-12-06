@@ -32,7 +32,9 @@ class G1MimicFuture(G1MimicDistill):
         
         # Initialize FALCON-style curriculum force application flag BEFORE super().__init__
         # This is needed because reset_idx is called during parent initialization
-        self.enable_force_curriculum = getattr(cfg.env, 'enable_force_curriculum', False)
+        # Support None value to completely disable force curriculum
+        _enable_force = getattr(cfg.env, 'enable_force_curriculum', False)
+        self.enable_force_curriculum = bool(_enable_force) if _enable_force is not None else False
         
         # Initialize force curriculum attributes with default values before calling super().__init__
         # This prevents AttributeError during reset_idx call in parent initialization
@@ -81,10 +83,13 @@ class G1MimicFuture(G1MimicDistill):
             print("Error aware sampling logging initialized")
         
         # Initialize FALCON-style curriculum force application if enabled
+        # Only initialize if enable_force_curriculum is True (not None or False)
         if self.enable_force_curriculum:
             self._init_force_curriculum_components(cfg)
             force_links = getattr(cfg.env.force_curriculum, 'force_apply_links', ['left_rubber_hand', 'right_rubber_hand'])
             print(f"Force curriculum enabled with force application to {len(force_links)} links: {force_links}")
+        else:
+            print("Force curriculum disabled (enable_force_curriculum is None or False)")
     
     def _get_unified_motion_data(self):
         """Get unified motion data for both privileged and future frames in a single sampling call.
