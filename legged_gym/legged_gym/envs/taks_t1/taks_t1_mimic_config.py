@@ -132,7 +132,7 @@ class TaksT1MimicCfg(HumanoidMimicCfg):
         # self_collisions = 1  # 1 to disable self-collisions
         
         torso_name: str = 'pelvis'
-        chest_name: str = 'imu_in_torso'
+        chest_name: str = 'torso_link'
 
         thigh_name: str = 'hip'
         shank_name: str = 'knee'
@@ -234,11 +234,11 @@ class TaksT1MimicCfg(HumanoidMimicCfg):
         added_mass_range = [-3., 3]
         
         randomize_base_com = (True and domain_rand_general)
-        added_com_range = [-0.05, 0.05]
+        added_com_range = [-0.1, 0.1]
         
         push_robots = (True and domain_rand_general)
         push_interval_s = 4
-        max_push_vel_xy = 1.0
+        max_push_vel_xy = 1.5
         
         push_end_effector = (True and domain_rand_general)
         push_end_effector_interval_s = 2

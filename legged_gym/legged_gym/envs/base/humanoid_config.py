@@ -199,7 +199,7 @@ class HumanoidCfg(BaseConfig):
         
         push_robots = (True and domain_rand_general)
         push_interval_s = 8
-        max_push_vel_xy = 1.0
+        max_push_vel_xy = 1.5
 
         randomize_motor = (True and domain_rand_general)
         motor_strength_range = [0.8, 1.2]

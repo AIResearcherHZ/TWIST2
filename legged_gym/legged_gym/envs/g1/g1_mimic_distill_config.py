@@ -296,11 +296,11 @@ class G1MimicPrivCfg(HumanoidMimicCfg):
         added_mass_range = [-3., 3]
         
         randomize_base_com = (True and domain_rand_general)
-        added_com_range = [-0.05, 0.05]
+        added_com_range = [-0.1, 0.1]
         
         push_robots = (True and domain_rand_general)
         push_interval_s = 4
-        max_push_vel_xy = 1.0
+        max_push_vel_xy = 1.5
         
         push_end_effector = (False and domain_rand_general)
         push_end_effector_interval_s = 2

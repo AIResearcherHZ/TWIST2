@@ -186,7 +186,7 @@ class HumanoidCharCfg(BaseConfig):
         
         push_robots = (True and domain_rand_general)
         push_interval_s = 8
-        max_push_vel_xy = 1.0
+        max_push_vel_xy = 1.5
         
         push_end_effector = (True and domain_rand_general)
         push_end_effector_interval_s = 8

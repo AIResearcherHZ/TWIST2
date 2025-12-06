@@ -112,21 +112,21 @@ class G1MimicStuFutureCfg(G1MimicPrivCfg):
         friction_range = [0.1, 2.]
 
         randomize_base_mass = (True and domain_rand_general)
-        added_mass_range = [-3., 3]
+        added_mass_range = [-1., 3]
 
         randomize_base_com = (True and domain_rand_general)
-        added_com_range = [-0.05, 0.05]
+        added_com_range = [-0.1, 0.1]
 
         push_robots = (True and domain_rand_general)
         push_interval_s = 4
-        max_push_vel_xy = 1.0
+        max_push_vel_xy = 1.5
 
         push_end_effector = (False and domain_rand_general)
         push_end_effector_interval_s = 2
         max_push_force_end_effector = 10.0
 
         randomize_motor = (True and domain_rand_general)
-        motor_strength_range = [0.5, 2.0]
+        motor_strength_range = [0.1, 2.0]
 
         action_delay = (True and domain_rand_general)
         action_buf_len = 8
@@ -175,11 +175,11 @@ class G1MimicStuFutureCfg(G1MimicPrivCfg):
         
         # 惯量随机化 - 模拟电机转子惯量不确定性
         randomize_armature = (True and domain_rand_general)
-        armature_range = [0.5, 2.0]  # 惯量缩放范围
+        armature_range = [0.1, 2.0]  # 惯量缩放范围
         
         # 刚体惯性随机化 - 模拟连杆惯性不确定性
         randomize_link_inertia = (True and domain_rand_general)
-        link_inertia_range = [0.5, 2.0]  # 刚体惯性缩放范围
+        link_inertia_range = [0.1, 2.0]  # 刚体惯性缩放范围
 
     class rewards(G1MimicPrivCfg.rewards):
         # All reward scales can be set to None to completely disable that reward
