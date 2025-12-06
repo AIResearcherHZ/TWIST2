@@ -360,7 +360,7 @@ class G1MimicCfgPPO(HumanoidMimicCfgPPO):
         max_iterations = 10001 # number of policy updates
 
         # logging
-        save_interval = 200 # check for potential saves every this many iterations
+        save_interval = 110 # check for potential saves every this many iterations
         experiment_name = 'test'
         run_name = ''
         # load and resume

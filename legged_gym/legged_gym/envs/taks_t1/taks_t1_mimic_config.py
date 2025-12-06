@@ -344,7 +344,7 @@ class TaksT1MimicCfgPPO(HumanoidMimicCfgPPO):
         runner_class_name = 'OnPolicyRunner'
         max_iterations = 10001
 
-        save_interval = 200
+        save_interval = 110
         experiment_name = 'test'
         run_name = ''
         resume = False

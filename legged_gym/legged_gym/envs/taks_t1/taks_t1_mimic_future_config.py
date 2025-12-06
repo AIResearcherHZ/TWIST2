@@ -202,7 +202,7 @@ class TaksT1MimicStuFutureCfgDAgger(TaksT1MimicStuFutureCfg):
         max_iterations = 10001
         warm_iters = 100
 
-        save_interval = 200
+        save_interval = 110
         experiment_name = 'test'
         run_name = ''
         resume = False
