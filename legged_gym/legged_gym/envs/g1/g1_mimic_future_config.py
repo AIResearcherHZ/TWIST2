@@ -3,8 +3,11 @@ from legged_gym.envs.base.humanoid_mimic_config import HumanoidMimicCfgPPO
 from legged_gym import LEGGED_GYM_ROOT_DIR
 
 
-# TAR_MOTION_STEPS_FUTURE = [1,2,3,4,5]
-TAR_MOTION_STEPS_FUTURE = [0]
+# 未来帧配置：
+# - TAR_MOTION_STEPS_FUTURE_OBS: 用于 obs 输入，保持 [0] 以兼容 sim2sim/sim2real
+# - TAR_MOTION_STEPS_FUTURE_REWARD: 用于奖励计算，10帧未来动作
+TAR_MOTION_STEPS_FUTURE_OBS = [0]  # 保持原始 obs 维度
+TAR_MOTION_STEPS_FUTURE_REWARD = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50]  # 10帧用于奖励
 class G1MimicStuFutureCfg(G1MimicPrivCfg):
     """Student policy config with future motion support and curriculum masking.
     Extends existing G1MimicPrivCfg to add future motion capabilities."""
@@ -15,10 +18,10 @@ class G1MimicStuFutureCfg(G1MimicPrivCfg):
         # Keep original student motion steps (current frame only)
         tar_motion_steps = [0]
         
-        # Future motion frames (additional input, not in history)
-        # tar_motion_steps_future = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50]
-        # tar_motion_steps_future = [1,2,3,4,5,6,7,8,9,10]
-        tar_motion_steps_future = TAR_MOTION_STEPS_FUTURE
+        # Future motion frames for obs (keep [0] for sim2sim/sim2real compatibility)
+        tar_motion_steps_future = TAR_MOTION_STEPS_FUTURE_OBS
+        # Future motion frames for reward calculation (10 frames)
+        tar_motion_steps_future_reward = TAR_MOTION_STEPS_FUTURE_REWARD
         
         
         # Observation dimensions (keep original structure)
@@ -26,9 +29,9 @@ class G1MimicStuFutureCfg(G1MimicPrivCfg):
         n_mimic_obs = len(tar_motion_steps) * n_mimic_obs_single  # Current frame only
         n_proprio = G1MimicPrivCfg.env.n_proprio
 
-        # Future observation dimensions (same structure as student mimic obs)
+        # Future observation dimensions (keep original for sim2sim/sim2real)
         n_future_obs_single = 6 + 29  # Masking disabled -> no indicator channel
-        n_future_obs = len(tar_motion_steps_future) * n_future_obs_single
+        n_future_obs = len(tar_motion_steps_future) * n_future_obs_single  # 保持原始维度
         
         # Total observation size: maintain original structure + future observations (no force obs needed)
         n_obs_single = n_mimic_obs + n_proprio  # Current frame observation (for history)
@@ -208,8 +211,6 @@ class G1MimicStuFutureCfg(G1MimicPrivCfg):
             future_action_consistency = 0.2  # Set to None to disable
             future_yaw_consistency = 0.1  # Set to None to disable
             turning_smoothness = -0.01  # Set to None to disable
-        
-        
 
 
 class G1MimicStuFutureCfgDAgger(G1MimicStuFutureCfg):
@@ -274,7 +275,7 @@ class G1MimicStuFutureCfgDAgger(G1MimicStuFutureCfg):
         future_dropout = 0.1                   # Dropout for future encoder
         temporal_embedding_dim = 64            # Temporal position embedding
         future_latent_dim = 128                # Future motion latent dimension
-        num_future_steps = len(TAR_MOTION_STEPS_FUTURE)                  # Number of future steps to expect
+        num_future_steps = len(TAR_MOTION_STEPS_FUTURE_OBS)  # obs用的未来帧数
         
         # Explicit future observation dimensions (avoid miscalculations when tweaking configs)
         num_future_observations = G1MimicStuFutureCfg.env.n_future_obs  # 360

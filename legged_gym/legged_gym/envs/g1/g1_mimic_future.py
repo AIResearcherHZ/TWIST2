@@ -55,9 +55,15 @@ class G1MimicFuture(G1MimicDistill):
         
         # Only initialize future motion components if obs_type is 'student_future'
         if self.obs_type == 'student_future':
-            # Initialize future motion target steps
+            # Initialize future motion target steps for OBS (keep small for sim2sim/sim2real)
             self._tar_motion_steps_future = torch.tensor(
-                getattr(cfg.env, 'tar_motion_steps_future', [5, 10, 15, 20, 25, 30, 35, 40, 45, 50]), 
+                getattr(cfg.env, 'tar_motion_steps_future', [0]), 
+                device=self.device, dtype=torch.long
+            )
+            
+            # Initialize future motion target steps for REWARD (10 frames for consistency reward)
+            self._tar_motion_steps_future_reward = torch.tensor(
+                getattr(cfg.env, 'tar_motion_steps_future_reward', [5, 10, 15, 20, 25, 30, 35, 40, 45, 50]), 
                 device=self.device, dtype=torch.long
             )
             
@@ -72,8 +78,9 @@ class G1MimicFuture(G1MimicDistill):
                 device=self.device, dtype=torch.bool
             )
             
-            print(f"Future motion enabled with {len(self._tar_motion_steps_future)} future frames")
-            print(f"Future steps: {self._tar_motion_steps_future.tolist()}")
+            print(f"Future motion enabled with {len(self._tar_motion_steps_future)} obs frames")
+            print(f"Future obs steps: {self._tar_motion_steps_future.tolist()}")
+            print(f"Future reward steps ({len(self._tar_motion_steps_future_reward)} frames): {self._tar_motion_steps_future_reward.tolist()}")
         
         # Initialize error aware sampling logging
         if hasattr(cfg.motion, 'use_error_aware_sampling') and cfg.motion.use_error_aware_sampling:
@@ -207,10 +214,14 @@ class G1MimicFuture(G1MimicDistill):
 
 
 
-    def _get_mimic_obs(self):
-        """Override to use unified motion sampling for both privileged and future observations."""
+    def _get_mimic_obs(self, motion_data=None):
+        """Override to use unified motion sampling for both privileged and future observations.
+        Args:
+            motion_data: Optional pre-computed motion data to avoid redundant sampling.
+        """
         # Get unified motion data (SINGLE sampling call for all frames)
-        motion_data = self._get_unified_motion_data()
+        if motion_data is None:
+            motion_data = self._get_unified_motion_data()
         
         # Extract privileged motion data (first num_priv_steps)
         num_steps = motion_data['num_priv_steps']
@@ -278,9 +289,10 @@ class G1MimicFuture(G1MimicDistill):
         
         # Get motion observations
         if self.obs_type == 'student_future':
-            priv_mimic_obs, mimic_obs, future_obs = self._get_mimic_obs()
-            # 缓存未来动作数据用于奖励计算
+            # Get unified motion data ONCE and reuse for both mimic obs and caching
             motion_data = self._get_unified_motion_data()
+            priv_mimic_obs, mimic_obs, future_obs = self._get_mimic_obs(motion_data)
+            # 缓存未来动作数据用于奖励计算 (reuse motion_data, no redundant call)
             self._cache_future_motion_data(motion_data)
         else:
             priv_mimic_obs, mimic_obs = self._get_mimic_obs()
@@ -452,16 +464,13 @@ class G1MimicFuture(G1MimicDistill):
         # Call parent pre_physics_step
         super().pre_physics_step(actions)
         
-        # Update force curriculum components
+        # Update force curriculum components (only here, not in post_physics_step)
         if self.enable_force_curriculum:
             self._calculate_ee_forces()
     
     def post_physics_step(self):
-        """Override post_physics_step to include force application."""
-        # Apply forces here since pre_physics_step seems to not be called
-        if self.enable_force_curriculum:
-            self._calculate_ee_forces()
-        
+        """Override post_physics_step."""
+        # NOTE: Removed duplicate _calculate_ee_forces call - it's already called in pre_physics_step
         # Call parent post_physics_step
         super().post_physics_step()
 
@@ -775,16 +784,16 @@ class G1MimicFuture(G1MimicDistill):
                                   self.force_filter_alpha * final_forces
             final_forces = self.filtered_forces
         
-        # Apply forces to simulation using the correct tensor API
+        # Apply forces to simulation using vectorized tensor operations (no Python loops)
         if len(self.force_apply_body_indices) > 0:
             # Create forces tensor for all rigid bodies (initialize with zeros)
             all_forces = torch.zeros((self.num_envs * self.num_bodies, 3), device=self.device, dtype=torch.float)
             
+            # Vectorized: compute global body indices for all envs and all force links at once
+            env_offsets = torch.arange(self.num_envs, device=self.device) * self.num_bodies  # (num_envs,)
             for i, body_idx in enumerate(self.force_apply_body_indices):
-                # Calculate global body indices for all environments
-                for env_id in range(self.num_envs):
-                    global_body_idx = env_id * self.num_bodies + body_idx
-                    all_forces[global_body_idx] = final_forces[env_id, i]
+                global_indices = env_offsets + body_idx  # (num_envs,)
+                all_forces[global_indices] = final_forces[:, i]  # Vectorized assignment
      
             # Apply forces using the tensor API
             self.gym.apply_rigid_body_force_tensors(
@@ -835,14 +844,34 @@ class G1MimicFuture(G1MimicDistill):
         return yaw_acc
 
     def _cache_future_motion_data(self, motion_data):
-        """缓存未来动作数据用于奖励计算。"""
-        if motion_data['num_future_steps'] == 0:
+        """缓存未来动作数据用于奖励计算。
+        使用 _tar_motion_steps_future_reward 单独采样10帧未来数据用于奖励。
+        """
+        if not hasattr(self, '_tar_motion_steps_future_reward'):
             return
-
-        num_priv_steps = motion_data['num_priv_steps']
-        self._cached_future_dof_pos = motion_data['dof_pos'][:, num_priv_steps]
-        future_ang_vel_local = motion_data['root_ang_vel_local'][:, num_priv_steps]
-        self._cached_future_yaw_ang_vel = future_ang_vel_local[:, 2]
+        
+        # 单独采样奖励用的未来帧（不影响obs）
+        reward_steps = self._tar_motion_steps_future_reward
+        motion_times = self._get_motion_times().unsqueeze(-1)
+        obs_motion_times = reward_steps * self.dt + motion_times
+        motion_ids_tiled = torch.broadcast_to(
+            self._motion_ids.unsqueeze(-1), obs_motion_times.shape
+        ).flatten()
+        obs_motion_times = obs_motion_times.flatten()
+        
+        # 采样未来帧数据
+        root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, _, _, _ = \
+            self._motion_lib.calc_motion_frame(motion_ids_tiled, obs_motion_times)
+        
+        # Reshape
+        num_reward_steps = len(reward_steps)
+        dof_pos = dof_pos.reshape(self.num_envs, num_reward_steps, -1)
+        root_ang_vel_local = quat_rotate_inverse(root_rot, root_ang_vel)
+        root_ang_vel_local = root_ang_vel_local.reshape(self.num_envs, num_reward_steps, -1)
+        
+        # 使用第一帧未来数据作为奖励目标
+        self._cached_future_dof_pos = dof_pos[:, 0]
+        self._cached_future_yaw_ang_vel = root_ang_vel_local[:, 0, 2]
 
     def _reward_idle_penalty(self):
         """Penalize joint movement when close to target."""

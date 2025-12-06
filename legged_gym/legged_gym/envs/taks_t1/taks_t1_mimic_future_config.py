@@ -5,21 +5,28 @@ from legged_gym.envs.base.humanoid_mimic_config import HumanoidMimicCfgPPO
 from legged_gym import LEGGED_GYM_ROOT_DIR
 
 
-TAR_MOTION_STEPS_FUTURE = [0]
+# 未来帧配置：
+# - TAR_MOTION_STEPS_FUTURE_OBS: 用于 obs 输入，保持 [0] 以兼容 sim2sim/sim2real
+# - TAR_MOTION_STEPS_FUTURE_REWARD: 用于奖励计算，10帧未来动作
+TAR_MOTION_STEPS_FUTURE_OBS = [0]  # 保持原始 obs 维度
+TAR_MOTION_STEPS_FUTURE_REWARD = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50]
 
 
 class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
     class env(TaksT1MimicPrivCfg.env):
         obs_type = 'student_future'
         tar_motion_steps = [0]
-        tar_motion_steps_future = TAR_MOTION_STEPS_FUTURE
+        # Future motion frames for obs (keep [0] for sim2sim/sim2real)
+        tar_motion_steps_future = TAR_MOTION_STEPS_FUTURE_OBS
+        # Future motion frames for reward calculation (10 frames)
+        tar_motion_steps_future_reward = TAR_MOTION_STEPS_FUTURE_REWARD
 
         n_mimic_obs_single = 6 + 32
         n_mimic_obs = len(tar_motion_steps) * n_mimic_obs_single
         n_proprio = TaksT1MimicPrivCfg.env.n_proprio
 
         n_future_obs_single = 6 + 32
-        n_future_obs = len(tar_motion_steps_future) * n_future_obs_single
+        n_future_obs = len(tar_motion_steps_future) * n_future_obs_single  # 保持原始维度
 
         n_obs_single = n_mimic_obs + n_proprio
         num_observations = (n_obs_single *
@@ -233,7 +240,7 @@ class TaksT1MimicStuFutureCfgDAgger(TaksT1MimicStuFutureCfg):
         future_dropout = 0.1
         temporal_embedding_dim = 64
         future_latent_dim = 128
-        num_future_steps = len(TAR_MOTION_STEPS_FUTURE)
+        num_future_steps = len(TAR_MOTION_STEPS_FUTURE_OBS)
         num_future_observations = TaksT1MimicStuFutureCfg.env.n_future_obs
         num_experts = 4
         expert_hidden_dims = [256, 128]
