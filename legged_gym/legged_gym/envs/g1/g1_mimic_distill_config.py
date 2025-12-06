@@ -230,7 +230,11 @@ class G1MimicPrivCfg(HumanoidMimicCfg):
             ang_vel_xy = -0.01            
             ankle_dof_acc = -1e-7 * 2
             ankle_dof_vel = -1e-4 * 2
-            idle_penalty = -0.001
+
+            # 未来动作一致性奖励（只在训练时生效）
+            future_action_consistency = 0.2
+            future_yaw_consistency = 0.1
+            turning_smoothness = -0.01
 
             # TWIST version
             # tracking_joint_dof = 0.6

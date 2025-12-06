@@ -31,10 +31,10 @@ bash train.sh 1204_twist2 cuda:0
 bash eval.sh 1204_twist2 cuda:0
 
 # ONNX转换
-bash to_onnx.sh g1 legged_gym/logs/g1_stu_future/1204_twist2/model_11178.pt
+bash to_onnx.sh g1 legged_gym/logs/g1_stu_future/1204_twist2/model_13128.pt
 
 # SIM2SIM
-bash sim2sim.sh g1 legged_gym/logs/g1_stu_future/1204_twist2/model_11178.onnx
+bash sim2sim.sh g1 legged_gym/logs/g1_stu_future/1204_twist2/model_13128.onnx
 
 
 
