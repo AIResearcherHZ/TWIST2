@@ -60,7 +60,7 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             only_apply_resistance_when_walking = True
 
     class motion(TaksT1MimicPrivCfg.motion):
-        motion_file = f"{LEGGED_GYM_ROOT_DIR}/motion_data_configs/taks_t1_demo.yaml"
+        motion_file = f"{LEGGED_GYM_ROOT_DIR}/motion_data_configs/taks_t1.yaml"
         # Set to None to completely disable motion curriculum
         motion_curriculum = True  # Set to None/False to disable
         motion_curriculum_gamma = 0.01
