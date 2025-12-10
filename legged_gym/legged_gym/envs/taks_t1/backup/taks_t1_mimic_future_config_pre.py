@@ -110,11 +110,11 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
         
         # 惯量随机化 - 模拟电机转子惯量不确定性
         randomize_armature = (True and domain_rand_general)
-        armature_range = [0.1, 2.0]  # 惯量缩放范围
+        armature_range = [0.5, 2.0]  # 惯量缩放范围
         
         # 刚体惯性随机化 - 模拟连杆惯性不确定性
         randomize_link_inertia = (True and domain_rand_general)
-        link_inertia_range = [0.1, 2.0]  # 刚体惯性缩放范围
+        link_inertia_range = [0.5, 2.0]  # 刚体惯性缩放范围
 
     class rewards(TaksT1MimicPrivCfg.rewards):
         # All reward scales can be set to None to completely disable that reward
