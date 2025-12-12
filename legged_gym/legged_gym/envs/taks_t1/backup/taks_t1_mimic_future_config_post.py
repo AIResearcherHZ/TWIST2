@@ -103,7 +103,7 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
         max_push_force_end_effector = 10.0
 
         randomize_motor = (True and domain_rand_general)
-        motor_strength_range = [0.1, 2.0]
+        motor_strength_range = [0.5, 2.0]
 
         action_delay = (True and domain_rand_general)
         action_buf_len = 8
