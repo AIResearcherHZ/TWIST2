@@ -247,7 +247,7 @@ class TaksT1MimicPrivCfg(HumanoidMimicCfg):
         
         push_robots = (True and domain_rand_general)
         push_interval_s = 4
-        max_push_vel_xy = 2.0
+        max_push_vel_xy = 1.5
         
         push_end_effector = (False and domain_rand_general)
         push_end_effector_interval_s = 2
