@@ -1009,9 +1009,10 @@ class HumanoidMimic(HumanoidChar):
         return key_body_pos_err
     
     def _update_max_key_body_error(self):
-        """Update max key body error for each motion for error aware sampling."""
+        """Update max key body error for each motion for error aware sampling.
+        Optimized with scatter_reduce to avoid Python loops."""
         # Calculate current key body position error for all environments
-        key_body_pos = self.rigid_body_states[:, self._key_body_ids, 0:3] # (num_envs, num_key_bodies, 3)
+        key_body_pos = self.rigid_body_states[:, self._key_body_ids, 0:3]
         key_body_pos = key_body_pos - self.root_states[:, 0:3].unsqueeze(1)
         if not self.global_obs:
             base_yaw_quat = quat_from_euler_xyz(0*self.yaw, 0*self.yaw, self.yaw)
@@ -1025,17 +1026,14 @@ class HumanoidMimic(HumanoidChar):
             tar_key_body_pos = convert_to_local_root_body_pos(ref_yaw_quat, tar_key_body_pos)
         
         # Calculate L1 error for each key body part and take maximum across all key body parts
-        key_body_pos_diff = torch.abs(key_body_pos - tar_key_body_pos) # (num_envs, num_key_bodies, 3)
-        key_body_pos_error_per_part = torch.mean(key_body_pos_diff, dim=-1) # (num_envs, num_key_bodies)
-        current_max_error = torch.max(key_body_pos_error_per_part, dim=-1)[0] # (num_envs,)
+        key_body_pos_diff = torch.abs(key_body_pos - tar_key_body_pos)
+        key_body_pos_error_per_part = torch.mean(key_body_pos_diff, dim=-1)
+        current_max_error = torch.max(key_body_pos_error_per_part, dim=-1)[0]
         
-        # Update max error for each motion
-        for env_id in range(self.num_envs):
-            motion_id = self._motion_ids[env_id]
-            self.max_key_body_error[motion_id] = torch.max(
-                self.max_key_body_error[motion_id], 
-                current_max_error[env_id]
-            )
+        # Update max error for each motion using scatter_reduce (vectorized, no Python loop)
+        self.max_key_body_error.scatter_reduce_(
+            0, self._motion_ids, current_max_error, reduce='amax'
+        )
     
     def _error_feet_slip(self):
         contact = self.contact_forces[:, self.feet_indices, 2] > 5.

@@ -303,8 +303,14 @@ class TaksT1MimicFuture(TaksT1MimicDistill):
             getattr(force_cfg, 'apply_force_z_range', [-50.0, 5.0]),
             device=self.device)
 
-        self.zero_force_prob = getattr(
-            force_cfg, 'zero_force_prob', [0.25, 0.25, 0.25])
+        # Pre-compute force range spans for efficiency
+        self._force_x_span = self.apply_force_x_range[1] - self.apply_force_x_range[0]
+        self._force_y_span = self.apply_force_y_range[1] - self.apply_force_y_range[0]
+        self._force_z_span = self.apply_force_z_range[1] - self.apply_force_z_range[0]
+
+        self.zero_force_prob = torch.tensor(
+            getattr(force_cfg, 'zero_force_prob', [0.25, 0.25, 0.25]),
+            device=self.device)
         self.randomize_force_duration = getattr(
             force_cfg, 'randomize_force_duration', [150, 250])
 
@@ -327,11 +333,113 @@ class TaksT1MimicFuture(TaksT1MimicDistill):
               f"{len(self.force_apply_body_indices)} force application points")
 
     def _update_force_curriculum(self, env_ids):
-        pass
+        """Update force scale based on episode performance (curriculum learning)."""
+        if not self.force_scale_curriculum:
+            return
+        if self.episode_length_counter is None or self.force_scale is None:
+            return
+        episode_lengths = self.episode_length_counter[env_ids]
+        good_mask = episode_lengths > self.force_scale_up_threshold
+        self.force_scale[env_ids[good_mask]] = torch.clamp(
+            self.force_scale[env_ids[good_mask]] + self.force_scale_up,
+            self.force_scale_min, self.force_scale_max)
+        poor_mask = episode_lengths < self.force_scale_down_threshold
+        self.force_scale[env_ids[poor_mask]] = torch.clamp(
+            self.force_scale[env_ids[poor_mask]] - self.force_scale_down,
+            self.force_scale_min, self.force_scale_max)
+        self.episode_length_counter[env_ids] = 0
+        self.force_duration_counter[env_ids] = 0
+        self.force_duration_target[env_ids] = torch.randint(
+            self.randomize_force_duration[0], self.randomize_force_duration[1] + 1,
+            (len(env_ids),), device=self.device)
 
     def _apply_motion_domain_randomization(self, root_pos, root_rot, root_vel,
                                            root_ang_vel, dof_pos, dof_vel):
         return root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel
+
+    def pre_physics_step(self, actions):
+        """Override pre_physics_step to include force updates."""
+        super().pre_physics_step(actions)
+        if self.enable_force_curriculum:
+            self._calculate_ee_forces()
+
+    def _calculate_ee_forces(self):
+        """Calculate end-effector forces based on FALCON's curriculum force approach.
+        Optimized with vectorized operations and pre-computed constants."""
+        # Increment counters (in-place)
+        self.episode_length_counter.add_(1)
+        self.force_duration_counter.add_(1)
+
+        # Check which environments need new force application
+        need_new_forces = self.force_duration_counter >= self.force_duration_target
+        num_new = need_new_forces.sum().item()
+
+        if num_new > 0:
+            # Reset force duration counter and set new targets
+            self.force_duration_counter[need_new_forces] = 0
+            self.force_duration_target[need_new_forces] = torch.randint(
+                self.randomize_force_duration[0],
+                self.randomize_force_duration[1] + 1,
+                (num_new,), device=self.device)
+
+            num_links = len(self.force_apply_body_indices)
+
+            # Generate random forces for all axes at once using pre-computed spans
+            rand_vals = torch.rand(num_new, num_links, 3, device=self.device)
+            new_forces = torch.empty(num_new, num_links, 3, device=self.device)
+            new_forces[..., 0] = (rand_vals[..., 0] * self._force_x_span +
+                                  self.apply_force_x_range[0])
+            new_forces[..., 1] = (rand_vals[..., 1] * self._force_y_span +
+                                  self.apply_force_y_range[0])
+            new_forces[..., 2] = (rand_vals[..., 2] * self._force_z_span +
+                                  self.apply_force_z_range[0])
+
+            # Apply zero force probability (vectorized)
+            zero_mask = torch.rand(
+                num_new, num_links, 3, device=self.device) < self.zero_force_prob
+            new_forces[zero_mask] = 0.0
+
+            # Update forces for environments that need new forces
+            self.applied_forces[need_new_forces] = new_forces
+
+        # Apply phase-based modulation (triangular wave) - in-place operations
+        if not hasattr(self, 'force_phase'):
+            self.force_phase = torch.zeros(self.num_envs, device=self.device)
+        self.force_phase.add_(0.02)
+        self.force_phase.fmod_(2.0)
+
+        # Triangular wave: 0->1->0 over phase [0, 2) - vectorized
+        phase_modulation = torch.where(
+            self.force_phase < 1.0,
+            self.force_phase,
+            2.0 - self.force_phase)
+
+        # Apply curriculum scaling and phase modulation (fully vectorized)
+        scale_factor = (self.force_scale * phase_modulation).unsqueeze(-1).unsqueeze(-1)
+        final_forces = self.applied_forces * scale_factor
+
+        # Apply forces to simulation using fully vectorized tensor operations
+        num_links = len(self.force_apply_body_indices)
+        if num_links > 0:
+            # Pre-compute global indices for all envs and links (cache on first call)
+            if not hasattr(self, '_force_global_indices'):
+                env_offsets = (torch.arange(self.num_envs, device=self.device)
+                               .unsqueeze(1) * self.num_bodies)
+                link_offsets = self.force_apply_body_indices.unsqueeze(0)
+                self._force_global_indices = (env_offsets + link_offsets).flatten()
+
+            # Create forces tensor and assign using advanced indexing
+            all_forces = torch.zeros(
+                (self.num_envs * self.num_bodies, 3),
+                device=self.device, dtype=torch.float)
+            all_forces[self._force_global_indices] = final_forces.reshape(-1, 3)
+
+            # Apply forces using the tensor API
+            self.gym.apply_rigid_body_force_tensors(
+                self.sim,
+                gymtorch.unwrap_tensor(all_forces),
+                None,
+                gymapi.ENV_SPACE)
 
     # ==================== 未来动作一致性奖励 ====================
     # 这些奖励只在训练时生效，不影响sim2sim/sim2real部署

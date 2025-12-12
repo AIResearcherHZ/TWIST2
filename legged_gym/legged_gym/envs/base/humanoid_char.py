@@ -110,29 +110,28 @@ class HumanoidChar(LeggedRobot):
         # 应用动作噪声
         action_tensor = self._apply_action_noise(action_tensor)
         
-        self.action_history_buf = torch.cat([self.action_history_buf[:, 1:].clone(), action_tensor[:, None, :].clone()], dim=1)
+        # Update action history buffer (in-place roll + assign)
+        self.action_history_buf[:, :-1] = self.action_history_buf[:, 1:].clone()
+        self.action_history_buf[:, -1] = action_tensor
         
         if self.cfg.domain_rand.action_delay:
-            # Curriculum for action delay - linear increase from 0 to 0.5 probability
-            start_step = 5000 * 24  # Starting step for curriculum
-            target_step = 20000 * 24  # Target step where probability reaches 0.5
+            # Curriculum for action delay - use pre-cached constants
+            if not hasattr(self, '_delay_start_step'):
+                self._delay_start_step = 5000 * 24
+                self._delay_target_step = 20000 * 24
+                self._delay_step_range = self._delay_target_step - self._delay_start_step
             
-            if self.total_env_steps_counter <= start_step:
+            # Compute delay probability with clamped linear interpolation
+            if self.total_env_steps_counter <= self._delay_start_step:
                 delay_prob = 0.0
-            elif self.total_env_steps_counter >= target_step:
+            elif self.total_env_steps_counter >= self._delay_target_step:
                 delay_prob = 0.5
             else:
-                # Linear interpolation between start and target steps
-                delay_prob = 0.5 * (self.total_env_steps_counter - start_step) / (target_step - start_step)
+                delay_prob = 0.5 * (self.total_env_steps_counter - self._delay_start_step) / self._delay_step_range
             
-            # Directly sample delay from [0,1] with probability [1-delay_prob, delay_prob]
-            if torch.rand(1, device=self.device) < delay_prob:
-                self.delay = torch.tensor(1.0, device=self.device, dtype=torch.float)
-            else:
-                self.delay = torch.tensor(0.0, device=self.device, dtype=torch.float)
-                
-            indices = -self.delay - 1
-            action_tensor = self.action_history_buf[:, indices.long()]
+            # Sample delay (avoid tensor creation when possible)
+            delay_idx = -2 if torch.rand(1, device=self.device).item() < delay_prob else -1
+            action_tensor = self.action_history_buf[:, delay_idx]
 
         self.global_counter += 1
         self.total_env_steps_counter += 1
@@ -284,191 +283,222 @@ class HumanoidChar(LeggedRobot):
         if self.cfg.domain_rand.push_robots and  (self.common_step_counter % self.cfg.domain_rand.push_interval == 0):
             self._push_robots()
     
-    def _randomize_gravity(self, external_force = None):
+    def _randomize_gravity(self, external_force=None):
+        """Randomize gravity vector.
+        Optimized: Uses pre-cached base gravity tensor and avoids repeated tensor creation."""
         if self.cfg.domain_rand.randomize_gravity and external_force is None:
             min_gravity, max_gravity = self.cfg.domain_rand.gravity_range
-            external_force = torch.rand(3, dtype=torch.float, device=self.device,
-                                        requires_grad=False) * (max_gravity - min_gravity) + min_gravity
-
+            external_force = (torch.rand(3, dtype=torch.float, device=self.device)
+                              * (max_gravity - min_gravity) + min_gravity)
 
         sim_params = self.gym.get_sim_params(self.sim)
         if external_force is None:
-            gravity = torch.Tensor([0, 0, -9.81]).to(self.device)
+            gravity = self._base_gravity
         else:
-            gravity = external_force + torch.Tensor([0, 0, -9.81]).to(self.device)
+            gravity = external_force + self._base_gravity
         self.gravity_vec[:, :] = gravity.unsqueeze(0) / torch.norm(gravity)
-        sim_params.gravity = gymapi.Vec3(gravity[0], gravity[1], gravity[2])
+        sim_params.gravity = gymapi.Vec3(gravity[0].item(), gravity[1].item(), gravity[2].item())
         self.gym.set_sim_params(self.sim, sim_params)
     
     # ==================== 新增域随机化方法 ====================
     def _init_domain_rand_buffers(self):
-        """Initialize buffers for new domain randomization features."""
-        # 编码器偏置 - 每个环境的每个关节有固定偏置
-        if hasattr(self.cfg.domain_rand, 'encoder_noise') and self.cfg.domain_rand.encoder_noise:
-            pos_bias_range = self.cfg.domain_rand.encoder_pos_bias_range
-            vel_bias_range = self.cfg.domain_rand.encoder_vel_bias_range
-            self.encoder_pos_bias = torch.rand(self.num_envs, self.num_dof, device=self.device) * \
-                (pos_bias_range[1] - pos_bias_range[0]) + pos_bias_range[0]
-            self.encoder_vel_bias = torch.rand(self.num_envs, self.num_dof, device=self.device) * \
-                (vel_bias_range[1] - vel_bias_range[0]) + vel_bias_range[0]
+        """Initialize buffers for new domain randomization features.
+        Optimized: Pre-cache config checks and range spans to avoid repeated hasattr calls."""
+        dr = self.cfg.domain_rand
+        
+        # Cache config flags to avoid repeated hasattr checks
+        self._dr_encoder_noise = getattr(dr, 'encoder_noise', False)
+        self._dr_imu_noise = getattr(dr, 'imu_noise', False)
+        self._dr_joint_failure = getattr(dr, 'joint_failure', False)
+        self._dr_sensor_latency = getattr(dr, 'sensor_latency_spike', False)
+        self._dr_slope_rand = getattr(dr, 'slope_randomization', False)
+        self._dr_action_noise = getattr(dr, 'action_noise', False)
+        self._dr_obs_dropout = getattr(dr, 'observation_dropout', False)
+        
+        # Pre-compute range spans for encoder bias (avoid repeated subtraction)
+        if self._dr_encoder_noise:
+            pos_range = dr.encoder_pos_bias_range
+            vel_range = dr.encoder_vel_bias_range
+            self._enc_pos_bias_min = pos_range[0]
+            self._enc_pos_bias_span = pos_range[1] - pos_range[0]
+            self._enc_vel_bias_min = vel_range[0]
+            self._enc_vel_bias_span = vel_range[1] - vel_range[0]
+            self._enc_pos_noise_std = dr.encoder_pos_noise_std
+            self._enc_vel_noise_std = dr.encoder_vel_noise_std
+            # Initialize buffers
+            self.encoder_pos_bias = (torch.rand(self.num_envs, self.num_dof, device=self.device)
+                                     * self._enc_pos_bias_span + self._enc_pos_bias_min)
+            self.encoder_vel_bias = (torch.rand(self.num_envs, self.num_dof, device=self.device)
+                                     * self._enc_vel_bias_span + self._enc_vel_bias_min)
         else:
             self.encoder_pos_bias = torch.zeros(self.num_envs, self.num_dof, device=self.device)
             self.encoder_vel_bias = torch.zeros(self.num_envs, self.num_dof, device=self.device)
         
-        # IMU偏置 - 每个环境有固定偏置
-        if hasattr(self.cfg.domain_rand, 'imu_noise') and self.cfg.domain_rand.imu_noise:
-            ang_bias_range = self.cfg.domain_rand.imu_ang_vel_bias_range
-            self.imu_ang_vel_bias = torch.rand(self.num_envs, 3, device=self.device) * \
-                (ang_bias_range[1] - ang_bias_range[0]) + ang_bias_range[0]
+        # Pre-compute IMU bias range spans
+        if self._dr_imu_noise:
+            ang_range = dr.imu_ang_vel_bias_range
+            self._imu_ang_bias_min = ang_range[0]
+            self._imu_ang_bias_span = ang_range[1] - ang_range[0]
+            self._imu_ang_noise_std = dr.imu_ang_vel_noise_std
+            self.imu_ang_vel_bias = (torch.rand(self.num_envs, 3, device=self.device)
+                                     * self._imu_ang_bias_span + self._imu_ang_bias_min)
         else:
             self.imu_ang_vel_bias = torch.zeros(self.num_envs, 3, device=self.device)
         
         # 观测历史缓冲区 - 用于丢包时保持上一帧值
         self.last_obs_buf = None
         
-        # 关节故障状态 - 每个环境的每个关节是否故障
-        if hasattr(self.cfg.domain_rand, 'joint_failure') and self.cfg.domain_rand.joint_failure:
-            self.joint_failure_mask = torch.ones(self.num_envs, self.num_dof, device=self.device)
-        else:
-            self.joint_failure_mask = torch.ones(self.num_envs, self.num_dof, device=self.device)
+        # Pre-cache action noise std
+        if self._dr_action_noise:
+            self._action_noise_std = dr.action_noise_std
+        
+        # Pre-cache observation dropout params
+        if self._dr_obs_dropout:
+            self._obs_dropout_prob = dr.observation_dropout_prob
+            self._obs_dropout_mode = dr.observation_dropout_mode
+        
+        # 关节故障状态
+        self.joint_failure_mask = torch.ones(self.num_envs, self.num_dof, device=self.device)
+        if self._dr_joint_failure:
+            self._joint_failure_prob = dr.joint_failure_prob
+            self._joint_failure_weak = dr.joint_failure_weak_factor
         
         # 传感器延迟尖峰状态
-        if hasattr(self.cfg.domain_rand, 'sensor_latency_spike') and self.cfg.domain_rand.sensor_latency_spike:
+        if self._dr_sensor_latency:
+            self._latency_spike_prob = dr.sensor_latency_spike_prob
+            self._latency_max_steps = dr.sensor_latency_max_steps
             self.sensor_latency_counter = torch.zeros(self.num_envs, device=self.device, dtype=torch.int)
             self.sensor_latency_obs = None
         
-        # 重力偏置 - 模拟坡度
-        if hasattr(self.cfg.domain_rand, 'slope_randomization') and self.cfg.domain_rand.slope_randomization:
-            x_range = self.cfg.domain_rand.gravity_bias_x_range
-            y_range = self.cfg.domain_rand.gravity_bias_y_range
-            z_range = self.cfg.domain_rand.gravity_bias_z_range
+        # Pre-compute gravity bias range spans
+        if self._dr_slope_rand:
+            x_range = dr.gravity_bias_x_range
+            y_range = dr.gravity_bias_y_range
+            z_range = dr.gravity_bias_z_range
+            self._grav_x_min, self._grav_x_span = x_range[0], x_range[1] - x_range[0]
+            self._grav_y_min, self._grav_y_span = y_range[0], y_range[1] - y_range[0]
+            self._grav_z_min, self._grav_z_span = z_range[0], z_range[1] - z_range[0]
             self.gravity_bias = torch.zeros(self.num_envs, 3, device=self.device)
-            self.gravity_bias[:, 0] = torch.rand(self.num_envs, device=self.device) * (x_range[1] - x_range[0]) + x_range[0]
-            self.gravity_bias[:, 1] = torch.rand(self.num_envs, device=self.device) * (y_range[1] - y_range[0]) + y_range[0]
-            self.gravity_bias[:, 2] = torch.rand(self.num_envs, device=self.device) * (z_range[1] - z_range[0]) + z_range[0]
+            self.gravity_bias[:, 0] = torch.rand(self.num_envs, device=self.device) * self._grav_x_span + self._grav_x_min
+            self.gravity_bias[:, 1] = torch.rand(self.num_envs, device=self.device) * self._grav_y_span + self._grav_y_min
+            self.gravity_bias[:, 2] = torch.rand(self.num_envs, device=self.device) * self._grav_z_span + self._grav_z_min
         else:
             self.gravity_bias = torch.zeros(self.num_envs, 3, device=self.device)
+        
+        # Pre-allocate base gravity tensor (avoid repeated tensor creation)
+        self._base_gravity = torch.tensor([0., 0., -9.81], device=self.device)
     
     def _reset_domain_rand_buffers(self, env_ids):
-        """Reset domain randomization buffers for specified environments."""
+        """Reset domain randomization buffers for specified environments.
+        Optimized: Uses pre-cached config flags and range spans."""
         if len(env_ids) == 0:
             return
         
-        # 重新采样编码器偏置
-        if hasattr(self.cfg.domain_rand, 'encoder_noise') and self.cfg.domain_rand.encoder_noise:
-            pos_bias_range = self.cfg.domain_rand.encoder_pos_bias_range
-            vel_bias_range = self.cfg.domain_rand.encoder_vel_bias_range
-            self.encoder_pos_bias[env_ids] = torch.rand(len(env_ids), self.num_dof, device=self.device) * \
-                (pos_bias_range[1] - pos_bias_range[0]) + pos_bias_range[0]
-            self.encoder_vel_bias[env_ids] = torch.rand(len(env_ids), self.num_dof, device=self.device) * \
-                (vel_bias_range[1] - vel_bias_range[0]) + vel_bias_range[0]
+        n = len(env_ids)
         
-        # 重新采样IMU偏置
-        if hasattr(self.cfg.domain_rand, 'imu_noise') and self.cfg.domain_rand.imu_noise:
-            ang_bias_range = self.cfg.domain_rand.imu_ang_vel_bias_range
-            self.imu_ang_vel_bias[env_ids] = torch.rand(len(env_ids), 3, device=self.device) * \
-                (ang_bias_range[1] - ang_bias_range[0]) + ang_bias_range[0]
+        # 重新采样编码器偏置 (use pre-cached spans)
+        if self._dr_encoder_noise:
+            self.encoder_pos_bias[env_ids] = (torch.rand(n, self.num_dof, device=self.device)
+                                              * self._enc_pos_bias_span + self._enc_pos_bias_min)
+            self.encoder_vel_bias[env_ids] = (torch.rand(n, self.num_dof, device=self.device)
+                                              * self._enc_vel_bias_span + self._enc_vel_bias_min)
         
-        # 重新采样关节故障状态
-        if hasattr(self.cfg.domain_rand, 'joint_failure') and self.cfg.domain_rand.joint_failure:
+        # 重新采样IMU偏置 (use pre-cached spans)
+        if self._dr_imu_noise:
+            self.imu_ang_vel_bias[env_ids] = (torch.rand(n, 3, device=self.device)
+                                              * self._imu_ang_bias_span + self._imu_ang_bias_min)
+        
+        # 重新采样关节故障状态 (use pre-cached params)
+        if self._dr_joint_failure:
             self.joint_failure_mask[env_ids] = 1.0
-            failure_prob = self.cfg.domain_rand.joint_failure_prob
-            failure_mask = torch.rand(len(env_ids), self.num_dof, device=self.device) < failure_prob
-            weak_factor = self.cfg.domain_rand.joint_failure_weak_factor
-            self.joint_failure_mask[env_ids] = torch.where(failure_mask, 
-                torch.full_like(self.joint_failure_mask[env_ids], weak_factor),
+            failure_mask = torch.rand(n, self.num_dof, device=self.device) < self._joint_failure_prob
+            self.joint_failure_mask[env_ids] = torch.where(
+                failure_mask,
+                self._joint_failure_weak,
                 self.joint_failure_mask[env_ids])
         
-        # 重新采样重力偏置
-        if hasattr(self.cfg.domain_rand, 'slope_randomization') and self.cfg.domain_rand.slope_randomization:
-            x_range = self.cfg.domain_rand.gravity_bias_x_range
-            y_range = self.cfg.domain_rand.gravity_bias_y_range
-            z_range = self.cfg.domain_rand.gravity_bias_z_range
-            self.gravity_bias[env_ids, 0] = torch.rand(len(env_ids), device=self.device) * (x_range[1] - x_range[0]) + x_range[0]
-            self.gravity_bias[env_ids, 1] = torch.rand(len(env_ids), device=self.device) * (y_range[1] - y_range[0]) + y_range[0]
-            self.gravity_bias[env_ids, 2] = torch.rand(len(env_ids), device=self.device) * (z_range[1] - z_range[0]) + z_range[0]
+        # 重新采样重力偏置 (use pre-cached spans)
+        if self._dr_slope_rand:
+            self.gravity_bias[env_ids, 0] = torch.rand(n, device=self.device) * self._grav_x_span + self._grav_x_min
+            self.gravity_bias[env_ids, 1] = torch.rand(n, device=self.device) * self._grav_y_span + self._grav_y_min
+            self.gravity_bias[env_ids, 2] = torch.rand(n, device=self.device) * self._grav_z_span + self._grav_z_min
     
     def _apply_action_noise(self, actions):
-        """Apply noise to actions to simulate control signal imperfections."""
-        if hasattr(self.cfg.domain_rand, 'action_noise') and self.cfg.domain_rand.action_noise:
-            noise_std = self.cfg.domain_rand.action_noise_std
-            noise = torch.randn_like(actions) * noise_std
-            return actions + noise
+        """Apply noise to actions to simulate control signal imperfections.
+        Optimized: Uses pre-cached config flag and noise std."""
+        if self._dr_action_noise:
+            return actions.add_(torch.randn_like(actions) * self._action_noise_std)
         return actions
     
     def _get_noisy_dof_pos(self, dof_pos):
-        """Apply encoder noise and bias to joint positions."""
-        if hasattr(self.cfg.domain_rand, 'encoder_noise') and self.cfg.domain_rand.encoder_noise:
-            noise_std = self.cfg.domain_rand.encoder_pos_noise_std
-            noise = torch.randn_like(dof_pos) * noise_std
-            return dof_pos + noise + self.encoder_pos_bias
+        """Apply encoder noise and bias to joint positions.
+        Optimized: Uses pre-cached config flag and noise std."""
+        if self._dr_encoder_noise:
+            return dof_pos + torch.randn_like(dof_pos) * self._enc_pos_noise_std + self.encoder_pos_bias
         return dof_pos
     
     def _get_noisy_dof_vel(self, dof_vel):
-        """Apply encoder noise and bias to joint velocities."""
-        if hasattr(self.cfg.domain_rand, 'encoder_noise') and self.cfg.domain_rand.encoder_noise:
-            noise_std = self.cfg.domain_rand.encoder_vel_noise_std
-            noise = torch.randn_like(dof_vel) * noise_std
-            return dof_vel + noise + self.encoder_vel_bias
+        """Apply encoder noise and bias to joint velocities.
+        Optimized: Uses pre-cached config flag and noise std."""
+        if self._dr_encoder_noise:
+            return dof_vel + torch.randn_like(dof_vel) * self._enc_vel_noise_std + self.encoder_vel_bias
         return dof_vel
     
     def _get_noisy_ang_vel(self, ang_vel):
-        """Apply IMU noise and bias to angular velocity."""
-        if hasattr(self.cfg.domain_rand, 'imu_noise') and self.cfg.domain_rand.imu_noise:
-            noise_std = self.cfg.domain_rand.imu_ang_vel_noise_std
-            noise = torch.randn_like(ang_vel) * noise_std
-            return ang_vel + noise + self.imu_ang_vel_bias
+        """Apply IMU noise and bias to angular velocity.
+        Optimized: Uses pre-cached config flag and noise std."""
+        if self._dr_imu_noise:
+            return ang_vel + torch.randn_like(ang_vel) * self._imu_ang_noise_std + self.imu_ang_vel_bias
         return ang_vel
     
     def _apply_observation_dropout(self, obs):
-        """Apply random dropout to observations."""
-        if hasattr(self.cfg.domain_rand, 'observation_dropout') and self.cfg.domain_rand.observation_dropout:
-            dropout_prob = self.cfg.domain_rand.observation_dropout_prob
-            dropout_mode = self.cfg.domain_rand.observation_dropout_mode
+        """Apply random dropout to observations.
+        Optimized: Uses pre-cached config flags and params."""
+        if self._dr_obs_dropout:
+            dropout_mask = torch.rand_like(obs) < self._obs_dropout_prob
             
-            dropout_mask = torch.rand_like(obs) < dropout_prob
-            
-            if dropout_mode == 'hold' and self.last_obs_buf is not None:
+            if self._obs_dropout_mode == 'hold' and self.last_obs_buf is not None:
                 obs = torch.where(dropout_mask, self.last_obs_buf, obs)
-            elif dropout_mode == 'zero':
-                obs = torch.where(dropout_mask, torch.zeros_like(obs), obs)
+            elif self._obs_dropout_mode == 'zero':
+                obs.masked_fill_(dropout_mask, 0.0)
             
             self.last_obs_buf = obs.clone()
         return obs
     
     def _apply_sensor_latency_spike(self, obs):
-        """Apply occasional sensor latency spikes."""
-        if hasattr(self.cfg.domain_rand, 'sensor_latency_spike') and self.cfg.domain_rand.sensor_latency_spike:
-            spike_prob = self.cfg.domain_rand.sensor_latency_spike_prob
-            max_steps = self.cfg.domain_rand.sensor_latency_max_steps
-            
+        """Apply occasional sensor latency spikes.
+        Optimized: Uses pre-cached config flags and params."""
+        if self._dr_sensor_latency:
             # 检查是否触发新的延迟尖峰
-            new_spike = torch.rand(self.num_envs, device=self.device) < spike_prob
-            self.sensor_latency_counter[new_spike] = torch.randint(1, max_steps + 1, 
-                (new_spike.sum().item(),), device=self.device)
+            new_spike = torch.rand(self.num_envs, device=self.device) < self._latency_spike_prob
+            num_new = new_spike.sum().item()
+            if num_new > 0:
+                self.sensor_latency_counter[new_spike] = torch.randint(
+                    1, self._latency_max_steps + 1, (num_new,), device=self.device)
             
             # 对于有延迟的环境，保持旧观测
             if self.sensor_latency_obs is not None:
                 latency_mask = self.sensor_latency_counter > 0
-                obs[latency_mask] = self.sensor_latency_obs[latency_mask]
+                if latency_mask.any():
+                    obs[latency_mask] = self.sensor_latency_obs[latency_mask]
             
-            # 更新计数器和缓存
-            self.sensor_latency_counter = torch.clamp(self.sensor_latency_counter - 1, min=0)
+            # 更新计数器和缓存 (in-place)
+            self.sensor_latency_counter.sub_(1).clamp_(min=0)
             self.sensor_latency_obs = obs.clone()
         return obs
     
     def _apply_joint_failure(self, torques):
-        """Apply joint failure effects to torques."""
-        if hasattr(self.cfg.domain_rand, 'joint_failure') and self.cfg.domain_rand.joint_failure:
+        """Apply joint failure effects to torques.
+        Optimized: Uses pre-cached config flag."""
+        if self._dr_joint_failure:
             return torques * self.joint_failure_mask
         return torques
     
     def _get_gravity_with_slope(self):
-        """Get gravity vector with slope randomization applied."""
-        if hasattr(self.cfg.domain_rand, 'slope_randomization') and self.cfg.domain_rand.slope_randomization:
-            base_gravity = torch.tensor([0., 0., -9.81], device=self.device)
-            gravity_with_bias = base_gravity.unsqueeze(0) + self.gravity_bias
-            return gravity_with_bias
+        """Get gravity vector with slope randomization applied.
+        Optimized: Uses pre-cached base gravity tensor."""
+        if self._dr_slope_rand:
+            return self._base_gravity.unsqueeze(0) + self.gravity_bias
         return self.gravity_vec
     
     def _parse_cfg(self, cfg):
@@ -572,14 +602,15 @@ class HumanoidChar(LeggedRobot):
 
 
         if self.cfg.env.history_len > 0:
-            self.obs_history_buf = torch.where(
-                (self.episode_length_buf <= 1)[:, None, None],
-                torch.stack([obs_buf] * self.cfg.env.history_len, dim=1),
-                torch.cat([
-                    self.obs_history_buf[:, 1:],
-                    obs_buf.unsqueeze(1)
-                ], dim=1)
-            )
+            # Optimized history buffer update: in-place roll + selective reset
+            reset_mask = self.episode_length_buf <= 1
+            # Roll history buffer in-place
+            self.obs_history_buf[:, :-1] = self.obs_history_buf[:, 1:].clone()
+            self.obs_history_buf[:, -1] = obs_buf
+            # Reset history for newly reset environments
+            if reset_mask.any():
+                self.obs_history_buf[reset_mask] = obs_buf[reset_mask].unsqueeze(1).expand(
+                    -1, self.cfg.env.history_len, -1)
     
     def _build_body_ids_tensor(self, body_names):
         body_ids = []
