@@ -654,14 +654,15 @@ class HumanoidMimic(HumanoidChar):
         self.obs_buf = torch.cat([obs_buf, priv_latent, self.obs_history_buf.view(self.num_envs, -1)], dim=-1)
             
         if self.cfg.env.history_len > 0:
-            self.obs_history_buf = torch.where(
-                (self.episode_length_buf <= 1)[:, None, None], 
-                torch.stack([obs_buf] * self.cfg.env.history_len, dim=1),
-                torch.cat([
-                    self.obs_history_buf[:, 1:],
-                    obs_buf.unsqueeze(1)
-                ], dim=1)
-            )
+            # Optimized history buffer update: in-place roll + selective reset
+            reset_mask = self.episode_length_buf <= 1
+            # Roll history buffer in-place
+            self.obs_history_buf[:, :-1] = self.obs_history_buf[:, 1:].clone()
+            self.obs_history_buf[:, -1] = obs_buf
+            # Reset history for newly reset environments
+            if reset_mask.any():
+                self.obs_history_buf[reset_mask] = obs_buf[reset_mask].unsqueeze(1).expand(
+                    -1, self.cfg.env.history_len, -1)
         
             
     def _get_noise_scale_vec(self, cfg):

@@ -803,7 +803,8 @@ class G1MimicFuture(G1MimicDistill):
 
     def _reward_future_action_consistency(self):
         """奖励当前动作与未来目标动作的一致性。"""
-        if not hasattr(self, '_cached_future_dof_pos'):
+        # Use cached flag instead of hasattr for GPU efficiency
+        if not getattr(self, '_has_cached_future_data', False):
             return torch.zeros(self.num_envs, device=self.device)
 
         current_target_dof = (self.actions * self.cfg.control.action_scale +
@@ -816,7 +817,8 @@ class G1MimicFuture(G1MimicDistill):
 
     def _reward_future_yaw_consistency(self):
         """奖励当前角速度与未来目标角速度的一致性。"""
-        if not hasattr(self, '_cached_future_yaw_ang_vel'):
+        # Use cached flag instead of hasattr for GPU efficiency
+        if not getattr(self, '_has_cached_future_data', False):
             return torch.zeros(self.num_envs, device=self.device)
 
         current_yaw_ang_vel = self.base_ang_vel[:, 2]
@@ -828,45 +830,57 @@ class G1MimicFuture(G1MimicDistill):
 
     def _reward_turning_smoothness(self):
         """惩罚转身时的角速度突变。"""
-        if not hasattr(self, '_last_base_ang_vel'):
-            self._last_base_ang_vel = self.base_ang_vel.clone()
+        # Use pre-initialized buffer instead of hasattr + clone for GPU efficiency
+        if not hasattr(self, '_last_base_ang_vel_initialized'):
+            self._last_base_ang_vel = torch.zeros_like(self.base_ang_vel)
+            self._last_base_ang_vel_initialized = True
             return torch.zeros(self.num_envs, device=self.device)
 
         ang_vel_change = self.base_ang_vel - self._last_base_ang_vel
         yaw_acc = ang_vel_change[:, 2] ** 2
-        self._last_base_ang_vel = self.base_ang_vel.clone()
+        # In-place copy instead of clone
+        self._last_base_ang_vel.copy_(self.base_ang_vel)
 
         return yaw_acc
 
     def _cache_future_motion_data(self, motion_data):
         """缓存未来动作数据用于奖励计算。
-        使用 _tar_motion_steps_future_reward 单独采样10帧未来数据用于奖励。
+        复用 _get_unified_motion_data 中已采样的数据，避免重复采样。
         """
+        # Use cached flag for efficiency
         if not hasattr(self, '_tar_motion_steps_future_reward'):
+            self._has_cached_future_data = False
             return
         
-        # 单独采样奖励用的未来帧（不影响obs）
-        reward_steps = self._tar_motion_steps_future_reward
-        motion_times = self._get_motion_times().unsqueeze(-1)
-        obs_motion_times = reward_steps * self.dt + motion_times
-        motion_ids_tiled = torch.broadcast_to(
-            self._motion_ids.unsqueeze(-1), obs_motion_times.shape
-        ).flatten()
-        obs_motion_times = obs_motion_times.flatten()
-        
-        # 采样未来帧数据
-        root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, _, _, _ = \
-            self._motion_lib.calc_motion_frame(motion_ids_tiled, obs_motion_times)
-        
-        # Reshape
-        num_reward_steps = len(reward_steps)
-        dof_pos = dof_pos.reshape(self.num_envs, num_reward_steps, -1)
-        root_ang_vel_local = quat_rotate_inverse(root_rot, root_ang_vel)
-        root_ang_vel_local = root_ang_vel_local.reshape(self.num_envs, num_reward_steps, -1)
-        
-        # 使用第一帧未来数据作为奖励目标
-        self._cached_future_dof_pos = dof_pos[:, 0]
-        self._cached_future_yaw_ang_vel = root_ang_vel_local[:, 0, 2]
+        # 复用已有的motion_data，避免重复采样
+        # 从unified data中提取第一帧未来数据作为奖励目标
+        if motion_data is not None and motion_data['num_future_steps'] > 0:
+            num_priv_steps = motion_data['num_priv_steps']
+            # 使用第一帧未来数据
+            self._cached_future_dof_pos = motion_data['dof_pos'][:, num_priv_steps]
+            self._cached_future_yaw_ang_vel = motion_data['root_ang_vel_local'][:, num_priv_steps, 2]
+            self._has_cached_future_data = True
+        else:
+            # Fallback: 单独采样奖励用的未来帧
+            reward_steps = self._tar_motion_steps_future_reward
+            motion_times = self._get_motion_times().unsqueeze(-1)
+            obs_motion_times = reward_steps * self.dt + motion_times
+            motion_ids_tiled = torch.broadcast_to(
+                self._motion_ids.unsqueeze(-1), obs_motion_times.shape
+            ).flatten()
+            obs_motion_times = obs_motion_times.flatten()
+            
+            root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, _, _, _ = \
+                self._motion_lib.calc_motion_frame(motion_ids_tiled, obs_motion_times)
+            
+            num_reward_steps = len(reward_steps)
+            dof_pos = dof_pos.reshape(self.num_envs, num_reward_steps, -1)
+            root_ang_vel_local = quat_rotate_inverse(root_rot, root_ang_vel)
+            root_ang_vel_local = root_ang_vel_local.reshape(self.num_envs, num_reward_steps, -1)
+            
+            self._cached_future_dof_pos = dof_pos[:, 0]
+            self._cached_future_yaw_ang_vel = root_ang_vel_local[:, 0, 2]
+            self._has_cached_future_data = True
 
     def _reward_idle_penalty(self):
         """Penalize joint movement when close to target."""
