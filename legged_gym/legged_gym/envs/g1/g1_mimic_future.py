@@ -886,4 +886,18 @@ class G1MimicFuture(G1MimicDistill):
         """Penalize joint movement when close to target."""
         joint_vel_magnitude = torch.sum(torch.square(self.dof_vel), dim=1)
         return joint_vel_magnitude
-    
+
+    def _reward_feet_flat_contact(self):
+        """奖励脚掌全部着地（两只脚都接触地面）。"""
+        contact = self.contact_forces[:, self.feet_indices, 2] > 5.
+        both_feet_contact = torch.all(contact, dim=1).float()
+        return both_feet_contact
+
+    def _reward_ankle_roll_pitch_penalty(self):
+        """惩罚脚掌roll和pitch关节偏离默认位置（L1范数）。
+        G1的ankle关节索引: [4, 5, 10, 11] (左右脚的roll和pitch)
+        """
+        ankle_dof_idx = [4, 5, 10, 11]
+        ankle_pos_error = self.dof_pos[:, ankle_dof_idx] - \
+            self.default_dof_pos_all[:, ankle_dof_idx]
+        return torch.sum(torch.abs(ankle_pos_error), dim=1)

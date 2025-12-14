@@ -282,7 +282,7 @@ if __name__ == "__main__":
     parser.add_argument("--motion_file", help="Path to your *.pkl motion file for MotionLib", 
                         default="../motion_data/OMOMO_g1_GMR/sub1_clothesstand_067.pkl"
                         )
-    parser.add_argument("--robot", type=str, default="unitree_g1_with_hands", choices=["unitree_g1", "unitree_g1_with_hands"])
+    parser.add_argument("--robot", type=str, default="unitree_g1_with_hands", choices=["unitree_g1", "unitree_g1_with_hands", "taks_t1"])
     parser.add_argument("--steps", type=str,
                         # default="1,3,5,10,15,20,30,40,50",
                         default="1",
@@ -304,6 +304,9 @@ if __name__ == "__main__":
     
     if args.robot == "unitree_g1" or args.robot == "unitree_g1_with_hands":
         xml_file = f"{HERE}/../assets/g1/g1_mocap_29dof.xml"
+        robot_base = "pelvis"
+    elif args.robot == "taks_t1":
+        xml_file = f"{HERE}/../assets/Taks_T1/Taks_T1_sim2sim.xml"
         robot_base = "pelvis"
     else:
         raise ValueError(f"robot type {args.robot} not supported")

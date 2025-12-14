@@ -218,7 +218,16 @@ class RealTimePolicyController:
 
         self.ankle_idx = [4, 5, 10, 11]
 
-        self.n_mimic_obs = 38  # 6 + 32 (modified: root_vel_xy + root_pos_z + roll_pitch + yaw_ang_vel + dof_pos)
+        # Default mimic obs for Taks_T1 (38 dims: 6 root + 32 DOF)
+        self.default_mimic_obs = np.concatenate([
+            np.array([0, 0]),      # xy velocity
+            np.array([0.75]),      # z position
+            np.array([0, 0]),      # roll/pitch
+            np.array([0]),         # yaw angular velocity
+            self.default_dof_pos   # 32 DOF
+        ]).astype(np.float32)
+
+        self.n_mimic_obs = 38  # 6 + 32
         self.n_proprio = 3 + 2 + 3*32    # from config analysis
         self.n_obs_single = 38 + 3 + 2 + 3*32  # n_mimic_obs + n_proprio = 38 + 101 = 139
         self.history_len = 10
@@ -283,9 +292,9 @@ class RealTimePolicyController:
 
         # Send initial proprio to redis
         initial_obs = np.zeros(self.n_obs_single, dtype=np.float32)
-        self.redis_pipeline.set("state_body_unitree_g1_with_hands", json.dumps(initial_obs.tolist()))
-        self.redis_pipeline.set("state_hand_left_unitree_g1_with_hands", json.dumps(np.zeros(7).tolist()))
-        self.redis_pipeline.set("state_hand_right_unitree_g1_with_hands", json.dumps(np.zeros(7).tolist()))
+        self.redis_pipeline.set("state_body_taks_t1", json.dumps(initial_obs.tolist()))
+        self.redis_pipeline.set("state_hand_left_taks_t1", json.dumps(np.zeros(7).tolist()))
+        self.redis_pipeline.set("state_hand_right_taks_t1", json.dumps(np.zeros(7).tolist()))
         self.redis_pipeline.execute()
 
         measure_fps = self.measure_fps
@@ -324,22 +333,38 @@ class RealTimePolicyController:
 
                     # Send proprio to redis
                     
-                    self.redis_pipeline.set("state_body_unitree_g1_with_hands", json.dumps(state_body.tolist()))
-                    self.redis_pipeline.set("state_hand_left_unitree_g1_with_hands", json.dumps(np.zeros(7).tolist()))
-                    self.redis_pipeline.set("state_hand_right_unitree_g1_with_hands", json.dumps(np.zeros(7).tolist()))
-                    self.redis_pipeline.set("state_neck_unitree_g1_with_hands", json.dumps(np.zeros(2).tolist()))
+                    self.redis_pipeline.set("state_body_taks_t1", json.dumps(state_body.tolist()))
+                    self.redis_pipeline.set("state_hand_left_taks_t1", json.dumps(np.zeros(7).tolist()))
+                    self.redis_pipeline.set("state_hand_right_taks_t1", json.dumps(np.zeros(7).tolist()))
+                    self.redis_pipeline.set("state_neck_taks_t1", json.dumps(np.zeros(2).tolist()))
                     self.redis_pipeline.set("t_state", int(time.time() * 1000)) # current timestamp in ms
                     self.redis_pipeline.execute()
 
                     # Get mimic obs from Redis
-                    keys = ["action_body_unitree_g1_with_hands", "action_hand_left_unitree_g1_with_hands", "action_hand_right_unitree_g1_with_hands", "action_neck_unitree_g1_with_hands"]
+                    keys = ["action_body_taks_t1", "action_hand_left_taks_t1",
+                            "action_hand_right_taks_t1", "action_neck_taks_t1"]
                     for key in keys:
                         self.redis_pipeline.get(key)
                     redis_results = self.redis_pipeline.execute()
-                    action_mimic = json.loads(redis_results[0])
-                    action_left_hand = json.loads(redis_results[1])
-                    action_right_hand = json.loads(redis_results[2])
-                    action_neck = json.loads(redis_results[3])
+                    
+                    # Use default values if Redis data is None
+                    if redis_results[0] is None:
+                        action_mimic = self.default_mimic_obs.copy()
+                    else:
+                        action_mimic = np.array(json.loads(redis_results[0]),
+                                                dtype=np.float32)
+                    
+                    if redis_results[3] is None:
+                        action_neck = np.zeros(2, dtype=np.float32)
+                    else:
+                        action_neck = np.array(json.loads(redis_results[3]),
+                                               dtype=np.float32)
+
+                    # Handle G1 format (35 dims) -> Taks_T1 format (38 dims)
+                    if len(action_mimic) == 35:
+                        neck_joints = np.array([action_neck[0], 0.0, action_neck[1]],
+                                               dtype=np.float32)
+                        action_mimic = np.concatenate([action_mimic, neck_joints])
 
                     # Construct observation for TWIST2 controller
                     obs_full = np.concatenate([action_mimic, obs_proprio])

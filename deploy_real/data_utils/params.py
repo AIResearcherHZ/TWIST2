@@ -60,10 +60,28 @@ DEFAULT_MIMIC_OBS_TODDY = np.concatenate([
                     ])
                 ])
 
+# Taks_T1 default mimic obs (38 dims: 6 root + 32 DOF)
+DEFAULT_MIMIC_OBS_TAKS_T1 = np.concatenate([
+    np.array([0, 0]),  # xy velocity
+    np.array([0.75]),  # z position
+    np.array([0, 0]),  # roll/pitch
+    np.array([0]),     # yaw angular velocity
+    # 32 DOF
+    np.array([
+        -0.2, 0.0, 0.0, 0.4, -0.2, 0.0,   # left leg (6)
+        -0.2, 0.0, 0.0, 0.4, -0.2, 0.0,   # right leg (6)
+        0.0, 0.0, 0.0,                     # waist (3)
+        0.0, 0.4, 0.0, 0.8, 0.0, 0.0, 0.0, # left arm (7)
+        0.0, -0.4, 0.0, 0.8, 0.0, 0.0, 0.0, # right arm (7)
+        0.0, 0.0, 0.0,                     # neck (3)
+    ])
+])
+
 DEFAULT_MIMIC_OBS = {
     "unitree_g1": DEFAULT_MIMIC_OBS_G1,
     "unitree_g1_mixed_mode": DEFAULT_MIMIC_OBS_G1_MIXED_MODE,
     "unitree_g1_with_hands": DEFAULT_MIMIC_OBS_G1,
+    "taks_t1": DEFAULT_MIMIC_OBS_TAKS_T1,
     "booster_t1": DEFAULT_MIMIC_OBS_T1,
     "stanford_toddy": DEFAULT_MIMIC_OBS_TODDY,
 }
@@ -148,6 +166,17 @@ DEFAULT_HAND_POSE = {
         "right": {
             "open": np.array([0, 0]), # parallel gripper
             "close": np.array([0, 0]), # parallel gripper
+        },
+    },
+    "taks_t1": 
+    {
+        "left": {
+            "open": np.array([0, 0, 0, 0, 0, 0, 0]),
+            "close": np.array([0, 0, 0, 0, 0, 0, 0]),
+        },
+        "right": {
+            "open": np.array([0, 0, 0, 0, 0, 0, 0]),
+            "close": np.array([0, 0, 0, 0, 0, 0, 0]),
         },
     },
 }

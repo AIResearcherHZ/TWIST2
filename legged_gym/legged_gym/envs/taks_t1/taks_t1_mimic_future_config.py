@@ -182,6 +182,13 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             ang_vel_xy = -0.02  # Set to None to disable
             ankle_dof_acc = -1e-7 * 2  # Set to None to disable
             ankle_dof_vel = -1e-4 * 2  # Set to None to disable
+            
+            # 脚掌着地奖励和脚掌roll/pitch保持不动惩罚
+            feet_flat_contact = 1.0  # 脚掌全部着地奖励
+            ankle_roll_pitch_penalty = -0.2  # 脚掌roll/pitch偏离惩罚
+            
+            # 头部neck三关节保持不动惩罚
+            neck_dof_penalty = -0.2  # neck三关节偏离惩罚
 
             # 未来动作一致性奖励（只在训练时生效）- Set to None to disable
             future_action_consistency = 0.2  # Set to None to disable
