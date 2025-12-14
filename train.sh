@@ -24,6 +24,6 @@ python train.py --task "${task_name}" \
                 --num_envs 10240 \
                 --exptid "${exptid}" \
                 --device "${device}" \
-                --teacher_exptid "None" \
-                --debug  # 调试模式（可视化）
-                # --resume
+                --teacher_exptid "None"
+                # --resume \
+                # --debug  # 调试模式（可视化）
