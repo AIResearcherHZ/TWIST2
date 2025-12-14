@@ -227,7 +227,11 @@ def reduce_all(x, op):
         if (is_tensor):
             buffer = x.clone()
         else:
-            buffer = torch.tensor(x, device=get_device())
+            # Use global_mp_device if set, otherwise use current CUDA device
+            device = get_device()
+            if device is None:
+                device = f"cuda:{torch.cuda.current_device()}"
+            buffer = torch.tensor(x, device=device)
 
         torch.distributed.all_reduce(buffer, op=op)
 
