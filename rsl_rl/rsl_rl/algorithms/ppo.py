@@ -33,6 +33,8 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.distributed as dist
 import numpy as np
+from torch.cuda.amp import GradScaler, autocast
+from contextlib import nullcontext
 
 from rsl_rl.modules import ActorCritic
 from rsl_rl.storage import RolloutStorage, ReplayBuffer
@@ -48,6 +50,36 @@ def reduce_tensor(tensor, world_size):
     dist.all_reduce(rt, op=dist.ReduceOp.SUM)
     rt /= world_size
     return rt
+
+
+def sync_gradients(model, world_size):
+    """Efficiently synchronize gradients across all processes using a single all_reduce."""
+    if world_size == 1:
+        return
+    
+    # Flatten all gradients into a single tensor for efficient communication
+    grads = []
+    for param in model.parameters():
+        if param.grad is not None:
+            grads.append(param.grad.view(-1))
+    
+    if not grads:
+        return
+    
+    # Concatenate all gradients
+    flat_grads = torch.cat(grads)
+    
+    # Single all_reduce operation (much more efficient than per-parameter)
+    dist.all_reduce(flat_grads, op=dist.ReduceOp.SUM)
+    flat_grads /= world_size
+    
+    # Unflatten gradients back to parameters
+    offset = 0
+    for param in model.parameters():
+        if param.grad is not None:
+            numel = param.grad.numel()
+            param.grad.copy_(flat_grads[offset:offset + numel].view_as(param.grad))
+            offset += numel
 
 
 
@@ -76,6 +108,7 @@ class PPO:
                  distributed=False,
                  world_size=1,
                  rank=0,
+                 use_amp=True,
                  **kwargs
                  ):
 
@@ -87,6 +120,11 @@ class PPO:
         self.distributed = distributed
         self.world_size = world_size
         self.rank = rank
+        
+        # Mixed precision training (AMP)
+        self.use_amp = use_amp and torch.cuda.is_available()
+        self.scaler = GradScaler(enabled=self.use_amp)
+        self.amp_context = autocast if self.use_amp else nullcontext
 
         self.desired_kl = desired_kl
         self.schedule = schedule
@@ -220,18 +258,30 @@ class PPO:
                 # loss = self.teacher_alpha * imitation_loss + (1 - self.teacher_alpha) * loss
 
                 # Gradient step
-                self.optimizer.zero_grad()
-                loss.backward()
+                self.optimizer.zero_grad(set_to_none=True)  # More efficient than zero_grad()
                 
-                # Synchronize gradients across all processes in distributed training
-                if self.distributed and self.world_size > 1:
-                    for param in self.actor_critic.parameters():
-                        if param.grad is not None:
-                            dist.all_reduce(param.grad, op=dist.ReduceOp.SUM)
-                            param.grad /= self.world_size
-                
-                nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.max_grad_norm)
-                self.optimizer.step()
+                if self.use_amp:
+                    self.scaler.scale(loss).backward()
+                    
+                    # Synchronize gradients across all processes in distributed training
+                    if self.distributed and self.world_size > 1:
+                        self.scaler.unscale_(self.optimizer)
+                        sync_gradients(self.actor_critic, self.world_size)
+                    else:
+                        self.scaler.unscale_(self.optimizer)
+                    
+                    nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.max_grad_norm)
+                    self.scaler.step(self.optimizer)
+                    self.scaler.update()
+                else:
+                    loss.backward()
+                    
+                    # Synchronize gradients across all processes in distributed training
+                    if self.distributed and self.world_size > 1:
+                        sync_gradients(self.actor_critic, self.world_size)
+                    
+                    nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.max_grad_norm)
+                    self.optimizer.step()
 
                 mean_value_loss += value_loss.item()
                 mean_surrogate_loss += surrogate_loss.item()

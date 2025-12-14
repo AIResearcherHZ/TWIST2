@@ -1,81 +1,73 @@
-================================================================================
+=================================================================================
                               仓库与环境准备
-================================================================================
+=================================================================================
+
 【Git 仓库克隆】
+说明：TWIST2/HOVER 需要拉 submodules。
 git clone https://github.com/AIResearcherHZ/isaaclab.git
 git clone https://github.com/AIResearcherHZ/S2S2R.git
 git clone https://github.com/AIResearcherHZ/whole_body_tracking.git
 git clone https://github.com/AIResearcherHZ/GMR.git
 git clone --recurse-submodules https://github.com/AIResearcherHZ/TWIST2.git
-git clone --recurse-submodules https://github.com/AIResearcherHZ/HOVER
+git clone --recurse-submodules https://github.com/AIResearcherHZ/HOVER.git
 
-
-【服务器 VNC】
+【服务器 VNC（可选，用于远程可视化）】
 /opt/TurboVNC/bin/vncserver \
   -wm xfce \
   -securitytypes none
 
-【预启动】
+【预启动（可选，若训练/数据通路依赖 Redis）】
 redis-server --daemonize yes
 
 【环境测试】
 bash run_motion_server.sh
 
-================================================================================
+=================================================================================
                                     训练
-================================================================================
-# 训练
+=================================================================================
+
+【单卡训练】
 bash train.sh 1214_twist2 cuda:0
 
-# 评估
+【评估】
 bash eval.sh 1214_twist2 cuda:0
 
-# ONNX转换
+【导出 ONNX】
 bash to_onnx.sh g1 legged_gym/logs/g1_stu_future/1214_twist2/model_13128.pt
 
-# SIM2SIM
+【SIM2SIM（ONNX 回放/对齐验证）】
 bash sim2sim.sh g1 legged_gym/logs/g1_stu_future/1214_twist2/model_13128.onnx
 
+【单机多 GPU 训练】
+说明：脚本会将 total_envs 平均分到每张 GPU（不整除会自动向下取整到可均分的总数）。
 
-# 自动检测GPU数量
+1) 自动检测 GPU 数量
 bash train_multigpu.sh 1214_twist2
 
-# 指定GPU数量和总环境数
+2) 指定 GPU 数量和总环境数
 bash train_multigpu.sh 1214_twist2 3 30000
 
-Gym 可视化中的彩色点含义
-根据 
-humanoid_char.py
- 中的代码：
 
-🔴 红色点 color=(1, 0, 0)
-humanoid_char.py#604
-geom = gymutil.WireframeSphereGeometry(sphere_size, 32, 32, None, color=(1, 0, 0))
-机器人当前实际的关键身体部位位置 (rigid_body_states)，即机器人在仿真中实时的关节/身体位置。
+================================================================================
+                         Gym 可视化：彩色点含义（调试用）
+================================================================================
+说明：以下含义来自源码中 debug draw 的颜色约定。
 
-🟢 绿色点 color=(0, 1, 0)
-humanoid_char.py#653-655
-color = (0, 1, 0)
-geom = gymutil.WireframeSphereGeometry(sphere_size, 32, 32, None, color=color)
-ref_key_body_pos = self._ref_body_pos[:, self._key_body_ids, :3]
-参考动作的全局关键身体部位位置 (_ref_body_pos)，即目标动作数据中的全局坐标位置。_
+【红色点】color=(1, 0, 0)
+来源：humanoid_char.py（WireframeSphereGeometry, color=(1,0,0)）
+含义：机器人当前实际关键身体部位位置（rigid_body_states）。
 
-🔵 青色点 color=(0, 1, 1)
-humanoid_char.py#613
-color = (0, 1, 1)
-参考动作的局部关键身体部位位置（相对于机器人当前 root 位置转换后的参考位置）。
+【绿色点】color=(0, 1, 0)
+来源：humanoid_char.py（ref_key_body_pos = self._ref_body_pos[:, self._key_body_ids, :3]）
+含义：参考动作的关键身体部位全局位置（_ref_body_pos，全局坐标）。
 
-🟡 黄色点 color=(1, 1, 0)
-legged_robot.py#998
-sphere_geom = gymutil.WireframeSphereGeometry(0.02, 4, 4, None, color=(1, 1, 0))
-高度测量采样点 (
-_draw_height_samples
-)，用于地形感知的高度测量点位置。_
+【青色点】color=(0, 1, 1)
+来源：humanoid_char.py
+含义：参考动作的关键身体部位局部位置（相对当前 root 转换后的参考位置）。
 
-总结：
+【黄色点】color=(1, 1, 0)
+来源：legged_robot.py（_draw_height_samples）
+含义：地形高度测量采样点（用于地形感知/高度测量）。
 
-红色 = 机器人实际位置
-绿色 = 参考动作目标位置（全局）
-青色 = 参考动作目标位置（局部坐标系）
-黄色 = 高度测量点（如果启用地形测量）
-训练时，红色点和绿色/青色点越接近，说明动作跟踪效果越好。
+【如何看效果】
+训练时红色点越贴近绿色/青色点，通常代表动作跟踪越好。
