@@ -430,7 +430,7 @@ class OnPolicyDaggerRunner:
         if self.rank == 0:
             wandb.log(wandb_dict, step=locs['it'])
 
-        str = f" \033[1m Learning iteration {locs['it']}/{self.current_learning_iteration + locs['num_learning_iterations']} \033[0m "
+        str = f" \033[1m Learning iteration {locs['it']}/{locs['tot_iter']} \033[0m "
 
         scale_str = f"""{'Regularization_scale:':>{pad}} {locs['regularization_scale']:.4f}\n"""
         average_episode_length = f"""{'Average_episode_length:':>{pad}} {locs['average_episode_length']:.4f}\n"""

@@ -84,39 +84,24 @@ def train(args):
         if args.no_wandb:
             mode = "disabled"
             
-        # Extract robot type from task name (e.g., "taks_t1_stu_future" -> "taks_t1")
-        task_parts = args.task.split("_")
-        if task_parts[0] == "taks" and len(task_parts) > 1:
-            robot_type = f"{task_parts[0]}_{task_parts[1]}"  # taks_t1
-        else:
-            robot_type = task_parts[0]  # g1
-        wandb_project = f"{robot_type}_mimic"
+        # Extract robot type from task name (same logic as train.py)
+        robot_type = args.task.split("_")[0]
         
         try:
             wandb.init(
-                entity="far-wandb", 
-                project="twist", 
-                name=f"{args.exptid}_multigpu_{world_size}",
-                mode=mode, 
-                dir="../../logs",
-                config={
-                    "world_size": world_size,
-                    "num_envs_per_gpu": args.num_envs,
-                    "total_envs": args.num_envs * world_size,
-                }
+                entity="far-wandb",
+                project="twist",
+                name=args.exptid,
+                mode=mode,
+                dir="../../logs"
             )
         except:
             wandb.init(
-                project=wandb_project, 
-                name=f"{args.exptid}_multigpu_{world_size}",
-                mode=mode, 
+                project=args.proj_name,
+                name=args.exptid,
+                mode=mode,
                 dir="../../logs"
             )
-        
-        if robot_type == "g1":
-            wandb.save(LEGGED_GYM_ENVS_DIR + "/g1/g1_mimic_distill_config.py", policy="now")
-        elif robot_type == "taks_t1":
-            wandb.save(LEGGED_GYM_ENVS_DIR + "/taks_t1/taks_t1_mimic_future_config.py", policy="now")
     else:
         # Non-main processes don't log to wandb
         args.no_wandb = True
@@ -125,9 +110,11 @@ def train(args):
     if world_size > 1:
         dist.barrier()
     
-    print(f"[Rank {rank}] Creating environment on {args.device}...")
+    if is_main_process():
+        print(f"Creating environment on {args.device}...")
     env, _ = task_registry.make_env(name=args.task, args=args)
-    print(f"[Rank {rank}] Using motion file: {env.cfg.motion.motion_file}")
+    if is_main_process():
+        print(f"Using motion file: {env.cfg.motion.motion_file}")
     
     # Create runner with distributed training support
     ppo_runner, train_cfg = task_registry.make_alg_runner(
