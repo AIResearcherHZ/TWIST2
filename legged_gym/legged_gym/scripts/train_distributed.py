@@ -84,7 +84,12 @@ def train(args):
         if args.no_wandb:
             mode = "disabled"
             
-        robot_type = args.task.split("_")[0]
+        # Extract robot type from task name (e.g., "taks_t1_stu_future" -> "taks_t1")
+        task_parts = args.task.split("_")
+        if task_parts[0] == "taks" and len(task_parts) > 1:
+            robot_type = f"{task_parts[0]}_{task_parts[1]}"  # taks_t1
+        else:
+            robot_type = task_parts[0]  # g1
         wandb_project = f"{robot_type}_mimic"
         
         try:
@@ -110,6 +115,8 @@ def train(args):
         
         if robot_type == "g1":
             wandb.save(LEGGED_GYM_ENVS_DIR + "/g1/g1_mimic_distill_config.py", policy="now")
+        elif robot_type == "taks_t1":
+            wandb.save(LEGGED_GYM_ENVS_DIR + "/taks_t1/taks_t1_mimic_future_config.py", policy="now")
     else:
         # Non-main processes don't log to wandb
         args.no_wandb = True
