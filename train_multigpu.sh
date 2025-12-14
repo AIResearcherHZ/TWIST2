@@ -16,7 +16,7 @@ exptid=$1
 num_gpus=${2:-$(nvidia-smi -L | wc -l)}  # 自动检测 GPU 数量
 total_envs=${3:-8196}  # 默认总环境数
 
-robot_name="g1"
+robot_name="taks_t1"
 task_name="${robot_name}_stu_future"
 proj_name="${robot_name}_stu_future"
 
