@@ -74,7 +74,12 @@ class OnPolicyDaggerRunner:
                  env: VecEnv,
                  train_cfg,
                  log_dir=None,
-                 device='cpu', **kwargs):
+                 device='cpu',
+                 distributed=False,
+                 world_size=1,
+                 rank=0,
+                 local_rank=0,
+                 **kwargs):
 
         self.cfg = train_cfg["runner"]
         self.alg_cfg = train_cfg["algorithm"]
@@ -82,6 +87,12 @@ class OnPolicyDaggerRunner:
         self.device = device
         self.env = env
         self.normalize_obs = env.cfg.env.normalize_obs
+        
+        # Distributed training settings
+        self.distributed = distributed
+        self.world_size = world_size
+        self.rank = rank
+        self.local_rank = local_rank
 
         # Teacher configuration
         self.teacher_cfg = train_cfg["teachercfg"]["runner"]
@@ -413,7 +424,8 @@ class OnPolicyDaggerRunner:
             # wandb_dict['Train/mean_reward/time', statistics.mean(locs['rewbuffer']), self.tot_time)
             # wandb_dict['Train/mean_episode_length/time', statistics.mean(locs['lenbuffer']), self.tot_time)
 
-        wandb.log(wandb_dict, step=locs['it'])
+        if self.rank == 0:
+            wandb.log(wandb_dict, step=locs['it'])
 
         str = f" \033[1m Learning iteration {locs['it']}/{self.current_learning_iteration + locs['num_learning_iterations']} \033[0m "
 
