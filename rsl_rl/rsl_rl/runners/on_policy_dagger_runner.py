@@ -345,22 +345,25 @@ class OnPolicyDaggerRunner:
                 print(f"[INFO] 训练在第 {it} 次迭代时被中断")
                 return
             
-            if it < 2500:
-                if it % self.save_interval == 0:
-                    self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
-                    self._last_saved_iteration = it
-            elif it <= 10000:
-                if it % (2*self.save_interval) == 0:
-                    self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
-                    self._last_saved_iteration = it
-            else:
-                if it % (5*self.save_interval) == 0:
-                    self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
-                    self._last_saved_iteration = it
+            # Only rank 0 saves checkpoints
+            if self.rank == 0:
+                if it < 2500:
+                    if it % self.save_interval == 0:
+                        self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
+                        self._last_saved_iteration = it
+                elif it <= 10000:
+                    if it % (2*self.save_interval) == 0:
+                        self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
+                        self._last_saved_iteration = it
+                else:
+                    if it % (5*self.save_interval) == 0:
+                        self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
+                        self._last_saved_iteration = it
             ep_infos.clear()
         
-        # 正常结束时保存
-        self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(self.current_learning_iteration)))
+        # 正常结束时保存 (only rank 0)
+        if self.rank == 0:
+            self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(self.current_learning_iteration)))
     
     def _need_normalizer_update(self, iterations, update_iterations):
         return iterations < update_iterations
@@ -471,7 +474,9 @@ class OnPolicyDaggerRunner:
                        f"""{'Iteration time:':>{pad}} {iteration_time:.2f}s\n"""
                        f"""{'Total time:':>{pad}} {self.tot_time:.2f}s\n"""
                        f"""{'ETA:':>{pad}} {mins:.0f} mins {secs:.1f} s\n""")
-        print(log_string)
+        # Only rank 0 prints log
+        if self.rank == 0:
+            print(log_string)
 
     def save(self, path, infos=None):
         if self.normalize_obs:
