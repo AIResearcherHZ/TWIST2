@@ -492,11 +492,11 @@ class OnPolicyDaggerRunner:
             }
         torch.save(state_dict, path)
         
-        # Save to wandb only if enabled in config
-        if getattr(self.cfg, 'save_to_wandb', True):  # Default to True for backward compatibility
+        # Save to wandb only if enabled in config and only on rank 0
+        if getattr(self.cfg, 'save_to_wandb', True) and self.rank == 0:  # Default to True for backward compatibility
             wandb.save(path, base_path=os.path.dirname(path))
             print(f"Saved model to {path} as well as to wandb")
-        else:
+        elif self.rank == 0:
             print(f"Saved model to {path} (wandb saving disabled)")
 
     def load(self, path, load_optimizer=True):
