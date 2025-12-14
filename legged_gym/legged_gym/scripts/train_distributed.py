@@ -62,12 +62,15 @@ def train(args):
     
     log_pth = LEGGED_GYM_ROOT_DIR + "/logs/{}/".format(args.proj_name) + args.exptid
     
-    # Only main process creates directories and logs to wandb
+    # All processes create directories to avoid race condition
+    os.makedirs(log_pth, exist_ok=True)
+    
+    # Synchronize after directory creation
+    if world_size > 1:
+        dist.barrier()
+    
+    # Only main process logs to wandb
     if is_main_process():
-        try:
-            os.makedirs(log_pth)
-        except:
-            pass
         
         if args.debug:
             mode = "disabled"
@@ -82,6 +85,7 @@ def train(args):
             mode = "disabled"
             
         robot_type = args.task.split("_")[0]
+        wandb_project = f"{robot_type}_mimic"
         
         try:
             wandb.init(
@@ -98,7 +102,7 @@ def train(args):
             )
         except:
             wandb.init(
-                project="g1_mimic", 
+                project=wandb_project, 
                 name=f"{args.exptid}_multigpu_{world_size}",
                 mode=mode, 
                 dir="../../logs"
