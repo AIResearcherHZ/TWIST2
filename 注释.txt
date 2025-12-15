@@ -35,11 +35,11 @@ bash eval.sh 1214_twist2 cuda:0
 
 【导出 ONNX】
 bash to_onnx.sh g1 legged_gym/logs/g1_stu_future/1214_twist2/model_13128.pt
-bash to_onnx.sh taks_t1 legged_gym/logs/taks_t1_stu_future/1214_twist2/model_3740.pt
+bash to_onnx.sh taks_t1 legged_gym/logs/taks_t1_stu_future/1214_twist2/model_8140.pt
 
 【SIM2SIM（ONNX 回放/对齐验证）】
 bash sim2sim.sh g1 legged_gym/logs/g1_stu_future/1214_twist2/model_13128.onnx
-bash sim2sim.sh taks_t1 legged_gym/logs/taks_t1_stu_future/1214_twist2/model_3740.onnx
+bash sim2sim.sh taks_t1 legged_gym/logs/taks_t1_stu_future/1214_twist2/model_8140.onnx
 
 【单机多 GPU 训练】
 说明：脚本会将 total_envs 平均分到每张 GPU（不整除会自动向下取整到可均分的总数）。

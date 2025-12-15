@@ -158,10 +158,10 @@ class TaksT1MimicStuFutureCfgDAgger(TaksT1MimicStuFutureCfg):
         policy_class_name = 'ActorCriticFuture'
         algorithm_class_name = 'DaggerPPO'
         runner_class_name = 'OnPolicyDaggerRunner'
-        max_iterations = 10001
+        max_iterations = 10000
         warm_iters = 100
 
-        save_interval = 110
+        save_interval = 100
         experiment_name = 'test'
         run_name = ''
         resume = False

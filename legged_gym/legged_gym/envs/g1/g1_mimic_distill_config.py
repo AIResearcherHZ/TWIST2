@@ -424,7 +424,7 @@ class G1MimicPrivCfgPPO(HumanoidMimicCfgPPO):
         max_iterations = 1000001 # number of policy updates
 
         # logging
-        save_interval = 110 # check for potential saves every this many iterations
+        save_interval = 100 # check for potential saves every this many iterations
         experiment_name = 'test'
         run_name = ''
         # load and resume
@@ -467,7 +467,7 @@ class G1MimicStuCfgDAgger(G1MimicPrivCfgPPO):
         warm_iters = 100
         
         # logging
-        save_interval = 110
+        save_interval = 100
         experiment_name = 'test'
         run_name = ''
         resume = False
@@ -510,7 +510,7 @@ class G1MimicStuRLCfgDAgger(G1MimicStuRLCfg):
         warm_iters = 100
         
         # logging
-        save_interval = 110
+        save_interval = 100
         experiment_name = 'test'
         run_name = ''
         resume = False
