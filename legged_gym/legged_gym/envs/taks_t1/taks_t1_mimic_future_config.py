@@ -108,54 +108,54 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
         action_delay = (True and domain_rand_general)
         action_buf_len = 8
 
-        # 动作噪声
-        action_noise = (True and domain_rand_general)
-        action_noise_std = 0.01
+        # # 动作噪声
+        # action_noise = (True and domain_rand_general)
+        # action_noise_std = 0.01
 
-        # 关节编码器噪声
-        encoder_noise = (True and domain_rand_general)
-        encoder_pos_noise_std = 0.005
-        encoder_vel_noise_std = 0.01
-        encoder_pos_bias_range = [-0.01, 0.01]
-        encoder_vel_bias_range = [-0.02, 0.02]
+        # # 关节编码器噪声
+        # encoder_noise = (True and domain_rand_general)
+        # encoder_pos_noise_std = 0.005
+        # encoder_vel_noise_std = 0.01
+        # encoder_pos_bias_range = [-0.01, 0.01]
+        # encoder_vel_bias_range = [-0.02, 0.02]
 
-        # IMU噪声和漂移
-        imu_noise = (True and domain_rand_general)
-        imu_ang_vel_noise_std = 0.02
-        imu_lin_acc_noise_std = 0.05
-        imu_ang_vel_bias_range = [-0.1, 0.1]
-        imu_lin_acc_bias_range = [-0.2, 0.2]
-        imu_bias_drift_std = 0.01
+        # # IMU噪声和漂移
+        # imu_noise = (True and domain_rand_general)
+        # imu_ang_vel_noise_std = 0.02
+        # imu_lin_acc_noise_std = 0.05
+        # imu_ang_vel_bias_range = [-0.1, 0.1]
+        # imu_lin_acc_bias_range = [-0.2, 0.2]
+        # imu_bias_drift_std = 0.01
 
-        # 观测丢包
-        observation_dropout = (True and domain_rand_general)
-        observation_dropout_prob = 0.001
-        observation_dropout_mode = 'hold'
+        # # 观测丢包
+        # observation_dropout = (True and domain_rand_general)
+        # observation_dropout_prob = 0.001
+        # observation_dropout_mode = 'hold'
 
-        # 关节故障
-        joint_failure = (False and domain_rand_general)
-        joint_failure_prob = 0.0001
-        joint_failure_mode = 'weak'
-        joint_failure_weak_factor = 0.5
+        # # 关节故障
+        # joint_failure = (False and domain_rand_general)
+        # joint_failure_prob = 0.0001
+        # joint_failure_mode = 'weak'
+        # joint_failure_weak_factor = 0.5
 
-        # 传感器延迟尖峰
-        sensor_latency_spike = (True and domain_rand_general)
-        sensor_latency_spike_prob = 0.001
-        sensor_latency_max_steps = 10
+        # # 传感器延迟尖峰
+        # sensor_latency_spike = (True and domain_rand_general)
+        # sensor_latency_spike_prob = 0.001
+        # sensor_latency_max_steps = 10
 
-        # 重力方向偏置
-        slope_randomization = (True and domain_rand_general)
-        gravity_bias_x_range = [-0.1, 0.1]
-        gravity_bias_y_range = [-0.1, 0.1]
-        gravity_bias_z_range = [-0.05, 0.05]
+        # # 重力方向偏置
+        # slope_randomization = (True and domain_rand_general)
+        # gravity_bias_x_range = [-0.1, 0.1]
+        # gravity_bias_y_range = [-0.1, 0.1]
+        # gravity_bias_z_range = [-0.05, 0.05]
         
-        # 惯量随机化 - 模拟电机转子惯量不确定性
-        randomize_armature = (True and domain_rand_general)
-        armature_range = [0.5, 2.0]  # 惯量缩放范围
+        # # 惯量随机化 - 模拟电机转子惯量不确定性
+        # randomize_armature = (True and domain_rand_general)
+        # armature_range = [0.5, 2.0]  # 惯量缩放范围
         
-        # 刚体惯性随机化 - 模拟连杆惯性不确定性
-        randomize_link_inertia = (True and domain_rand_general)
-        link_inertia_range = [0.5, 2.0]  # 刚体惯性缩放范围
+        # # 刚体惯性随机化 - 模拟连杆惯性不确定性
+        # randomize_link_inertia = (True and domain_rand_general)
+        # link_inertia_range = [0.5, 2.0]  # 刚体惯性缩放范围
 
     class rewards(TaksT1MimicPrivCfg.rewards):
         # All reward scales can be set to None to completely disable that reward
