@@ -28,18 +28,20 @@ bash run_motion_server.sh taks_t1
 =================================================================================
 
 【单卡训练】
-bash train.sh 1215_twist2 cuda:0
+bash train.sh 1215_twist2 cuda:0 g1 10000
+bash train.sh 1215_twist2 cuda:0 taks_t1 10000
 
 【评估】
-bash eval.sh 1215_twist2 cuda:0
+bash eval.sh 1215_twist2 cuda:0 g1 4
+bash eval.sh 1215_twist2 cuda:0 taks_t1 4
 
 【导出 ONNX】
 bash to_onnx.sh g1 legged_gym/logs/g1_stu_future/1215_twist2/model_13128.pt
-bash to_onnx.sh taks_t1 legged_gym/logs/taks_t1_stu_future/1215_twist2/model_3000.pt
+bash to_onnx.sh taks_t1 legged_gym/logs/taks_t1_stu_future/1215_twist2/model_1900.pt
 
 【SIM2SIM（ONNX 回放/对齐验证）】
 bash sim2sim.sh g1 legged_gym/logs/g1_stu_future/1215_twist2/model_13128.onnx
-bash sim2sim.sh taks_t1 legged_gym/logs/taks_t1_stu_future/1215_twist2/model_3000.onnx
+bash sim2sim.sh taks_t1 legged_gym/logs/taks_t1_stu_future/1215_twist2/model_1900.onnx
 
 【单机多 GPU 训练】
 说明：脚本会将 total_envs 平均分到每张 GPU（不整除会自动向下取整到可均分的总数）。

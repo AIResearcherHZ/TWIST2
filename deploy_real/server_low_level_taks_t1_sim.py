@@ -110,15 +110,15 @@ class RealTimePolicyController:
         # neck_yaw, neck_roll, neck_pitch (3)
         self.default_dof_pos = np.array([
                 # left leg (6): hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll
-                -0.22, 0.0, 0.0, 0.52, -0.30, 0.0,
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                 # right leg (6): hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll  
-                -0.22, 0.0, 0.0, 0.52, -0.30, 0.0,
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                 # waist (3): yaw, roll, pitch
                 0.0, 0.0, 0.0,
                 # left arm (7): shoulder_pitch, shoulder_roll, shoulder_yaw, elbow, wrist_roll, wrist_yaw, wrist_pitch
-                0.17, 0.14, 0.0, 1.22, 0.0, 0.0, 0.0,
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                 # right arm (7): shoulder_pitch, shoulder_roll, shoulder_yaw, elbow, wrist_roll, wrist_yaw, wrist_pitch
-                0.17, -0.14, 0.0, 1.22, 0.0, 0.0, 0.0,
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                 # neck (3): yaw, roll, pitch
                 0.0, 0.0, 0.0,
             ])
@@ -130,15 +130,15 @@ class RealTimePolicyController:
             np.array([1, 0, 0, 0]),  # quaternion (w, x, y, z)
             np.array([
                 # left leg (6)
-                -0.22, 0.0, 0.0, 0.52, -0.30, 0.0,
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                 # right leg (6)
-                -0.22, 0.0, 0.0, 0.52, -0.30, 0.0,
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                 # waist (3)
                 0.0, 0.0, 0.0,
                 # left arm (7)
-                0.17, 0.14, 0.0, 1.22, 0.0, 0.0, 0.0,
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                 # right arm (7)
-                0.17, -0.14, 0.0, 1.22, 0.0, 0.0, 0.0,
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                 # neck (3)
                 0.0, 0.0, 0.0,
             ])
