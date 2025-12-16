@@ -208,7 +208,7 @@ class G1MimicStuFutureCfg(G1MimicPrivCfg):
             ankle_dof_vel = -1e-4 * 2  # Set to None to disable
             
             # 脚掌着地奖励和脚掌roll/pitch保持不动惩罚
-            feet_flat_contact = 2.0  # 脚掌全部着地奖励
+            # feet_flat_contact = 2.0  # 脚掌全部着地奖励
             ankle_roll_pitch_penalty = -0.25 # 脚掌roll/pitch偏离惩罚
             
             # 未来动作一致性奖励（只在训练时生效）- Set to None to disable
