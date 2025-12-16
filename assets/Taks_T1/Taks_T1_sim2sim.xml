@@ -285,9 +285,9 @@
                           mesh="left_wrist_yaw_link" />
                         <geom type="mesh" rgba="1.0 1.0 1.0 1" mesh="left_wrist_yaw_link" contype="8" conaffinity="1" />
 
-                        <body name="left_wrist_pitch_link" pos="0.0 0.022502 0.033299">
-                          <inertial pos="0.076857 -0.017165 0.011311" mass="0.28"
-                            diaginertia="0.000121333 0.000373333 0.00042" />
+                        <body name="left_wrist_pitch_link" pos="0.0 0.0225 0.0333">
+                          <inertial pos="0.0920 -0.0265 0.0015" mass="0.308"
+                            diaginertia="0.000256667 0.00133467 0.00140653"/>
                           <joint name="left_wrist_pitch_joint" pos="0 0 0" axis="0 1 0"
                             range="-0.9 0.9" actuatorfrcrange="-7 7" class="wrist_motor" />
                           <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1.0 1.0 1.0 1"
@@ -359,8 +359,8 @@
                         <geom type="mesh" rgba="1.0 1.0 1.0 1" mesh="right_wrist_yaw_link" contype="16" conaffinity="1" />
 
                         <body name="right_wrist_pitch_link" pos="0.0 -0.0225 0.0333">
-                          <inertial pos="0.076858 0.017168 0.01131" mass="0.28"
-                            diaginertia="0.000121333 0.000373333 0.00042" />
+                          <inertial pos="0.0920 0.0265 0.0015" mass="0.308"
+                            diaginertia="0.000256667 0.00133467 0.00140653"/>
                           <joint name="right_wrist_pitch_joint" pos="0 0 0" axis="0 1 0"
                             range="-0.9 0.9" actuatorfrcrange="-7 7" class="wrist_motor" />
                           <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1.0 1.0 1.0 1"
