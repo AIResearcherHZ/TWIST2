@@ -42,7 +42,7 @@ class TaksT1MimicCfg(HumanoidMimicCfg):
                      1.0, 1.0, 1.0,  # waist yaw, roll, pitch
                      1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,  # Left Arm (7 DOF with wrist)
                      1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,  # Right Arm (7 DOF with wrist)
-                     1.0, 1.0, 1.0,  # Neck (yaw, roll, pitch)
+                     0.5, 0.5, 0.2,  # Neck (yaw, roll, pitch) - 降低颈部权重，特别是pitch防止仰头
                      ]
         
         global_obs = False
@@ -203,7 +203,7 @@ class TaksT1MimicCfg(HumanoidMimicCfg):
             
             ankle_dof_acc = -1e-7 * 2
             ankle_dof_vel = -1e-4 * 2
-
+            
             # 未来动作一致性奖励（只在训练时生效）
             future_action_consistency = 0.2
             future_yaw_consistency = 0.1
@@ -333,7 +333,7 @@ class TaksT1MimicCfg(HumanoidMimicCfg):
                       "left_ankle_roll_link", "right_ankle_roll_link", 
                       "left_knee_link", "right_knee_link", 
                       "left_elbow_link", "right_elbow_link", 
-                      "head_mocap"]
+                      "neck_pitch_link"]
         
         motion_file = f"../../../../motion_data/LAFAN1_taks_t1_gmr/dance1_subject2.pkl"
 

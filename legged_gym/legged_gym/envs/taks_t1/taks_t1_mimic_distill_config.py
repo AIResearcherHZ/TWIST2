@@ -49,12 +49,12 @@ class TaksT1MimicPrivCfg(HumanoidMimicCfg):
         track_root = False
         root_tracking_termination_dist = 2.0
      
-        dof_err_w = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                     1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                     1.0, 1.0, 1.0,
-                     1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                     1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                     1.0, 1.0, 1.0,
+        dof_err_w = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0,  # Left Leg
+                     1.0, 1.0, 1.0, 1.0, 1.0, 1.0,  # Right Leg
+                     1.0, 1.0, 1.0,  # waist
+                     1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,  # Left Arm
+                     1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,  # Right Arm
+                     0.5, 0.5, 0.2,  # Neck - 降低颈部权重防止仰头
                      ]
         
         global_obs = False
