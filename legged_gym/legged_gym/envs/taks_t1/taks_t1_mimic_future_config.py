@@ -60,7 +60,7 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             only_apply_resistance_when_walking = True
 
     class motion(TaksT1MimicPrivCfg.motion):
-        motion_file = f"{LEGGED_GYM_ROOT_DIR}/motion_data_configs/taks_t1_demo.yaml"
+        motion_file = f"{LEGGED_GYM_ROOT_DIR}/motion_data_configs/taks_t1.yaml"
         # Set to None to completely disable motion curriculum
         motion_curriculum = True  # Set to None/False to disable
         motion_curriculum_gamma = 0.01
@@ -188,7 +188,7 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             # ankle_roll_pitch_penalty = -0.1 # 脚掌roll/pitch偏离惩罚
             
             # 头部neck三关节保持不动惩罚
-            neck_dof_penalty = -0.5  # neck三关节偏离惩罚
+            neck_dof_penalty = -0.25  # neck三关节偏离惩罚
 
             # 未来动作一致性奖励（只在训练时生效）- Set to None to disable
             future_action_consistency = 0.2  # Set to None to disable
@@ -206,7 +206,7 @@ class TaksT1MimicStuFutureCfgDAgger(TaksT1MimicStuFutureCfg):
         policy_class_name = 'ActorCriticFuture'
         algorithm_class_name = 'DaggerPPO'
         runner_class_name = 'OnPolicyDaggerRunner'
-        max_iterations = 10000
+        max_iterations = 20000
         warm_iters = 100
 
         save_interval = 100
