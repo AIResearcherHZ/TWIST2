@@ -42,9 +42,9 @@ if [ "$num_gpus" -eq 1 ]; then
         --num_envs ${total_envs} \
         --exptid "${exptid}" \
         --headless \
-        --teacher_exptid "None"
+        --teacher_exptid "None" \
+        --resume 
         # --debug  # 调试模式（可视化）
-        # --resume \
 else
     echo "Using distributed training with ${num_gpus} GPUs."
     cd legged_gym/legged_gym/scripts
@@ -57,7 +57,7 @@ else
         --num_envs ${envs_per_gpu} \
         --exptid "${exptid}" \
         --headless \
-        --teacher_exptid "None"
+        --teacher_exptid "None" \
+        --resume 
         # --debug  # 调试模式（可视化）
-        # --resume \
 fi
