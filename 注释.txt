@@ -3,7 +3,6 @@
 =================================================================================
 
 【Git 仓库克隆】
-说明：TWIST2/HOVER 需要拉 submodules。
 git clone https://github.com/AIResearcherHZ/isaaclab.git
 git clone https://github.com/AIResearcherHZ/S2S2R.git
 git clone https://github.com/AIResearcherHZ/whole_body_tracking.git
