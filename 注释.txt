@@ -50,7 +50,7 @@ bash train_multigpu.sh 1218_twist2
 
 2) 指定 GPU 数量和总环境数
 bash train_multigpu.sh 1218_twist2 3 24000
-
+bash train_multigpu.sh 1218_twist2 4 31961
 
 ================================================================================
                          Gym 可视化：彩色点含义（调试用）
