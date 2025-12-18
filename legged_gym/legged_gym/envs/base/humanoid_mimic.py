@@ -368,7 +368,7 @@ class HumanoidMimic(HumanoidChar):
             self._difficulty_log_counter = 0
         self._difficulty_log_counter += 1
         
-        if self._difficulty_log_counter % (2000*24) == 0:
+        if self._difficulty_log_counter % (1000*24) == 0:
             # Get motion names and difficulties
             motion_names = self._motion_lib.get_motion_names()
             high_difficulty_motions = [(name, diff.item()) for name, diff in zip(motion_names, self.motion_difficulty) if diff > MOTION_DIFFICULTY_MIN*2]
