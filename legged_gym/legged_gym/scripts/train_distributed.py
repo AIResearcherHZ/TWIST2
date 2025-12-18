@@ -112,9 +112,14 @@ def train(args):
     
     if is_main_process():
         print(f"Creating environment on {args.device}...")
-    env, _ = task_registry.make_env(name=args.task, args=args)
+    # Pass distributed parameters for motion data sharding
+    env, _ = task_registry.make_env(name=args.task, args=args,
+                                    distributed=(world_size > 1),
+                                    world_size=world_size,
+                                    rank=rank)
     if is_main_process():
         print(f"Using motion file: {env.cfg.motion.motion_file}")
+        print(f"Distributed training: {world_size} GPUs, each loading different motion subset")
     
     # Create runner with distributed training support
     ppo_runner, train_cfg = task_registry.make_alg_runner(

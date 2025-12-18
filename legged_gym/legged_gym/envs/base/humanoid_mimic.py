@@ -92,10 +92,18 @@ class HumanoidMimic(HumanoidChar):
         self._init_motion_buffers()
         
     def _load_motions(self):
+        # Check if distributed training parameters are available
+        distributed = getattr(self, '_distributed', False)
+        world_size = getattr(self, '_world_size', 1)
+        rank = getattr(self, '_rank', 0)
+        
         self._motion_lib = MotionLib(motion_file=self.cfg.motion.motion_file, device=self.device,
                                      sample_ratio=self.cfg.motion.sample_ratio,
-                                    motion_decompose=self.cfg.motion.motion_decompose,
-                                    motion_smooth=self.cfg.motion.motion_smooth)
+                                     motion_decompose=self.cfg.motion.motion_decompose,
+                                     motion_smooth=self.cfg.motion.motion_smooth,
+                                     distributed=distributed,
+                                     world_size=world_size,
+                                     rank=rank)
         return
     
     def _init_motion_buffers(self):
@@ -373,11 +381,13 @@ class HumanoidMimic(HumanoidChar):
                 log_dir = os.path.join(base_log_dir, "logs_motion_difficulty")
                 if not os.path.exists(log_dir):
                     os.makedirs(log_dir, exist_ok=True)
-                # Write to file
-                log_file = os.path.join(log_dir, f"{str(self._difficulty_log_counter//24)}.txt")
+                # Write to file (include rank for distributed training)
+                rank = getattr(self, '_rank', 0)
+                log_file = os.path.join(log_dir, f"rank{rank}_{str(self._difficulty_log_counter//24)}.txt")
                 with open(log_file, 'w') as f:
-                    f.write("Motions with difficulty > 5:\n")
-                    for name, diff in high_difficulty_motions:
+                    f.write(f"Motions with difficulty > {MOTION_DIFFICULTY_MIN*2} (Rank {rank}):\n")
+                    f.write(f"Total high difficulty motions: {len(high_difficulty_motions)}\n")
+                    for name, diff in sorted(high_difficulty_motions, key=lambda x: -x[1]):
                         f.write(f"Motion: {name}, Difficulty: {diff:.2f}\n")
     
     def _post_physics_step_callback(self):

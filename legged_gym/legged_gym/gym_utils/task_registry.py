@@ -63,13 +63,17 @@ class TaskRegistry():
         env_cfg.seed = train_cfg.seed
         return env_cfg, train_cfg
     
-    def make_env(self, name, args=None, env_cfg=None) -> Tuple[VecEnv, LeggedRobotCfg]:
+    def make_env(self, name, args=None, env_cfg=None, 
+                 distributed=False, world_size=1, rank=0) -> Tuple[VecEnv, LeggedRobotCfg]:
         """ Creates an environment either from a registered namme or from the provided config file.
 
         Args:
             name (string): Name of a registered env.
             args (Args, optional): Isaac Gym comand line arguments. If None get_args() will be called. Defaults to None.
             env_cfg (Dict, optional): Environment config file used to override the registered config. Defaults to None.
+            distributed (bool, optional): Whether using distributed training. Defaults to False.
+            world_size (int, optional): Number of processes in distributed training. Defaults to 1.
+            rank (int, optional): Global rank of this process. Defaults to 0.
 
         Raises:
             ValueError: Error if no registered env corresponds to 'name' 
@@ -100,6 +104,10 @@ class TaskRegistry():
                             physics_engine=args.physics_engine,
                             sim_device=args.sim_device,
                             headless=args.headless)
+        # Set distributed training parameters for motion data sharding
+        env._distributed = distributed
+        env._world_size = world_size
+        env._rank = rank
         return env, env_cfg
 
     def make_alg_runner(self, env, name=None, args=None, train_cfg=None, log_root="default", 

@@ -38,7 +38,11 @@ class MotionLib:
                  motion_decompose=False, 
                  motion_smooth=True, 
                  motion_height_adjust=False,
-                 sample_ratio=1.0 # only sample a portion of the motion
+                 sample_ratio=1.0, # only sample a portion of the motion
+                 # Distributed training parameters
+                 distributed=False,
+                 world_size=1,
+                 rank=0
                  ):
         self._device = device
 
@@ -50,6 +54,11 @@ class MotionLib:
         self._motion_height_adjust = motion_height_adjust
         # sample a portion of the motion
         self._sample_ratio = sample_ratio
+        
+        # Distributed training: each GPU loads a different subset of motions
+        self._distributed = distributed
+        self._world_size = world_size
+        self._rank = rank
         
         # load motions
         self._load_motions(motion_file)
@@ -81,7 +90,23 @@ class MotionLib:
         
         num_sub_motions_total = 0
             
-        for i in tqdm(range(num_motion_files), desc="[MotionLib] Loading motions"):
+        # Distributed training: partition motions across GPUs for maximum data coverage
+        if self._distributed and self._world_size > 1:
+            # Each GPU gets a non-overlapping subset of motions
+            # This ensures total environments cover maximum unique motions
+            motions_per_gpu = num_motion_files // self._world_size
+            start_idx = self._rank * motions_per_gpu
+            # Last GPU takes remaining motions
+            if self._rank == self._world_size - 1:
+                end_idx = num_motion_files
+            else:
+                end_idx = start_idx + motions_per_gpu
+            motion_indices = list(range(start_idx, end_idx))
+            print(f"[MotionLib] Rank {self._rank}/{self._world_size}: Loading motions {start_idx}-{end_idx} ({len(motion_indices)} motions)")
+        else:
+            motion_indices = list(range(num_motion_files))
+        
+        for i in tqdm(motion_indices, desc=f"[MotionLib] Loading motions (rank {self._rank})"):
             if torch.rand(1) > self._sample_ratio and num_motion_files > 1:
                 continue
             
