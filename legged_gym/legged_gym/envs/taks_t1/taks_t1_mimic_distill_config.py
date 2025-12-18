@@ -197,10 +197,10 @@ class TaksT1MimicPrivCfg(HumanoidMimicCfg):
             ankle_dof_acc = -1e-7 * 2
             ankle_dof_vel = -1e-4 * 2
                         
-            # 未来动作一致性奖励（只在训练时生效）
-            future_action_consistency = 0.2
-            future_yaw_consistency = 0.1
-            turning_smoothness = -0.01
+            # 未来动作一致性奖励（只在训练时生效）- Set to None to disable
+            future_action_consistency = 1.0  # Set to None to disable
+            future_yaw_consistency = 0.1  # Set to None to disable
+            turning_smoothness = -0.05  # Set to None to disable
 
         min_dist = 0.1
         max_dist = 0.4
@@ -211,8 +211,8 @@ class TaksT1MimicPrivCfg(HumanoidMimicCfg):
         tracking_sigma = 0.2
         tracking_sigma_ang = 0.125
         max_contact_force = 500
-        soft_torque_limit = 0.95
-        torque_safety_limit = 0.9
+        soft_torque_limit = 0.99
+        torque_safety_limit = 0.95
         
         termination_roll = 4.0
         termination_pitch = 4.0

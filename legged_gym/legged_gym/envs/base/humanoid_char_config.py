@@ -213,7 +213,7 @@ class HumanoidCharCfg(BaseConfig):
         tracking_sigma_ang = 0.125
         soft_dof_pos_limit = 0.95 # percentage of urdf limits, values above this limit are penalized
         soft_dof_vel_limit = 0.95
-        soft_torque_limit = 0.95
+        soft_torque_limit = 0.99
         max_contact_force = 100. # forces above this value are penalized
         feet_height_target = 0.2
         feet_air_time_target = 0.5

@@ -265,8 +265,8 @@ class G1MimicPrivCfg(HumanoidMimicCfg):
         tracking_sigma = 0.2
         tracking_sigma_ang = 0.125
         max_contact_force = 500  # Forces above this value are penalized
-        soft_torque_limit = 0.95
-        torque_safety_limit = 0.9
+        soft_torque_limit = 0.99
+        torque_safety_limit = 0.95
         
         # =========================
         termination_roll = 4.0
