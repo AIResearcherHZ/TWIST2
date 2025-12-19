@@ -161,16 +161,16 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
         # All reward scales can be set to None to completely disable that reward
         # Set any scale to None to skip computing that reward entirely
         class scales:
-            tracking_joint_dof = 2.0  # Set to None to disable
-            tracking_joint_vel = 0.2  # Set to None to disable
-            tracking_root_translation_z = 1.0  # Set to None to disable
-            tracking_root_rotation = 1.0  # Set to None to disable
-            tracking_root_linear_vel = 1.0  # Set to None to disable
-            tracking_root_angular_vel = 1.0  # Set to None to disable
-            tracking_keybody_pos = 2.0  # Set to None to disable
-            tracking_keybody_pos_global = 2.0  # Set to None to disable
-            alive = 0.5  # Set to None to disable
-            feet_slip = -0.1  # Set to None to disable
+            tracking_joint_dof = 2.22  # Set to None to disable
+            tracking_joint_vel = 0.222  # Set to None to disable
+            tracking_root_translation_z = 1.22  # Set to None to disable
+            tracking_root_rotation = 1.22  # Set to None to disable
+            tracking_root_linear_vel = 1.22  # Set to None to disable
+            tracking_root_angular_vel = 1.22  # Set to None to disable
+            tracking_keybody_pos = 2.22  # Set to None to disable
+            tracking_keybody_pos_global = 2.22  # Set to None to disable
+            alive = 0.522  # Set to None to disable
+            feet_slip = -0.122  # Set to None to disable
             feet_contact_forces = -5e-4  # Set to None to disable
             feet_stumble = -1.25  # Set to None to disable
             dof_pos_limits = -5.0  # Set to None to disable
