@@ -115,18 +115,17 @@
                   mesh="left_ankle_pitch_link" />
                 <geom type="mesh" rgba="1.0 1.0 1.0 1" mesh="left_ankle_pitch_link" />
 
-                <body name="left_ankle_roll_link" pos="0.04 -0.024 0.0">
-                  <inertial pos="0.00161 0.00307 -0.0384" mass="0.15"
-                    diaginertia="8.78125e-05 0.000507813 0.00058" />
+                <body name="left_ankle_roll_link" pos="0.0 -0.024 0.0">
+                  <inertial pos="0.04461 0.00307 -0.0384" mass="0.15"
+                    diaginertia="0.000132813 0.000612812 0.00073" />
                   <joint name="left_ankle_roll_joint" pos="0 0 0" axis="1 0 0"
                     range="-0.2618 0.2618" actuatorfrcrange="-27 27" class="ankle_motor" />
                   <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1.0 1.0 1.0 1"
                     mesh="left_ankle_roll_link" />
-                  <geom type="mesh" rgba="1.0 1.0 1.0 1" mesh="left_ankle_roll_link" />
-                  <geom size="0.005" pos="-0.08 0.025 -0.05" rgba="1.0 1.0 1.0 1"/>
-                  <geom size="0.005" pos="-0.08 -0.025 -0.05" rgba="1.0 1.0 1.0 1"/>
-                  <geom size="0.005" pos="0.08 0.025 -0.05" rgba="1.0 1.0 1.0 1"/>
-                  <geom size="0.005" pos="0.08 -0.025 -0.05" rgba="1.0 1.0 1.0 1"/>
+                  <geom size="0.01" pos="-0.04 0.025 -0.041" rgba="1.0 1.0 1.0 1"/>
+                  <geom size="0.01" pos="-0.04 -0.025 -0.041" rgba="1.0 1.0 1.0 1"/>
+                  <geom size="0.01" pos="0.12 0.025 -0.041" rgba="1.0 1.0 1.0 1"/>
+                  <geom size="0.01" pos="0.12 -0.025 -0.041" rgba="1.0 1.0 1.0 1"/>
                 </body>
               </body>
             </body>
@@ -179,18 +178,17 @@
                   mesh="right_ankle_pitch_link" />
                 <geom type="mesh" rgba="1.0 1.0 1.0 1" mesh="right_ankle_pitch_link" />
 
-                <body name="right_ankle_roll_link" pos="0.04 0.024 0.0">
-                  <inertial pos="-0.00161 0.00308 -0.0384" mass="0.15"
-                    diaginertia="8.78125e-05 0.000507813 0.00058" />
+                <body name="right_ankle_roll_link" pos="0.0 0.024 0.0">
+                  <inertial pos="0.04461 0.00308 -0.0384" mass="0.15"
+                    diaginertia="0.000132813 0.000612812 0.00073" />
                   <joint name="right_ankle_roll_joint" pos="0 0 0" axis="1 0 0"
                     range="-0.2618 0.2618" actuatorfrcrange="-27 27" class="ankle_motor" />
                   <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1.0 1.0 1.0 1"
                     mesh="right_ankle_roll_link" />
-                  <geom type="mesh" rgba="1.0 1.0 1.0 1" mesh="right_ankle_roll_link" />
-                  <geom size="0.005" pos="-0.08 0.025 -0.05" rgba="1.0 1.0 1.0 1"/>
-                  <geom size="0.005" pos="-0.08 -0.025 -0.05" rgba="1.0 1.0 1.0 1"/>
-                  <geom size="0.005" pos="0.08 0.025 -0.05" rgba="1.0 1.0 1.0 1"/>
-                  <geom size="0.005" pos="0.08 -0.025 -0.05" rgba="1.0 1.0 1.0 1"/>
+                  <geom size="0.01" pos="-0.04 0.025 -0.041" rgba="1.0 1.0 1.0 1"/>
+                  <geom size="0.01" pos="-0.04 -0.025 -0.041" rgba="1.0 1.0 1.0 1"/>
+                  <geom size="0.01" pos="0.12 0.025 -0.041" rgba="1.0 1.0 1.0 1"/>
+                  <geom size="0.01" pos="0.12 -0.025 -0.041" rgba="1.0 1.0 1.0 1"/>
                 </body>
               </body>
             </body>
