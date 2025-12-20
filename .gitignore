@@ -20,7 +20,6 @@ track_dataset/
 *.pt
 # Allow specific model checkpoints
 !legged_gym/logs_backup/taks_t1_stu_future/*/model_*.pt
-!legged_gym/logs/taks_t1_stu_future/*/model_*.pt
 *.log
 
 debug.mp4
