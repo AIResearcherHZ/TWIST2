@@ -346,9 +346,9 @@ class TaksT1MimicCfgPPO(HumanoidMimicCfgPPO):
         policy_class_name = 'ActorCriticMimic'
         algorithm_class_name = 'PPO'
         runner_class_name = 'OnPolicyRunner'
-        max_iterations = 20000
+        max_iterations = 50000
 
-        save_interval = 100
+        save_interval = 50
         experiment_name = 'test'
         run_name = ''
         resume = False

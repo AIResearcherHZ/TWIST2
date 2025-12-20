@@ -188,7 +188,7 @@ class G1MimicStuFutureCfgDAgger(G1MimicStuFutureCfg):
         warm_iters = 100
         
         # logging
-        save_interval = 100
+        save_interval = 50
         experiment_name = 'test'
         run_name = ''
         resume = False

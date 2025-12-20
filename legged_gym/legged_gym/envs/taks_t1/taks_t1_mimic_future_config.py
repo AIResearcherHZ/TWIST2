@@ -184,11 +184,11 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             ankle_dof_vel = -1e-4 * 2  # Set to None to disable
             
             # 脚掌着地奖励和脚掌roll/pitch保持不动惩罚
-            feet_flat_contact = 2.0  # 脚掌全部着地奖励
-            ankle_roll_pitch_penalty = -0.1 # 脚掌roll/pitch偏离惩罚
+            # feet_flat_contact = 2.0  # 脚掌全部着地奖励
+            # ankle_roll_pitch_penalty = -0.1 # 脚掌roll/pitch偏离惩罚
             
             # 头部neck三关节保持不动惩罚
-            neck_dof_penalty = -0.5  # neck三关节偏离惩罚
+            neck_dof_penalty = -0.25  # neck三关节偏离惩罚
 
             # # 未来动作一致性奖励（只在训练时生效）- Set to None to disable
             # future_action_consistency = 1.0  # Set to None to disable
@@ -206,10 +206,10 @@ class TaksT1MimicStuFutureCfgDAgger(TaksT1MimicStuFutureCfg):
         policy_class_name = 'ActorCriticFuture'
         algorithm_class_name = 'DaggerPPO'
         runner_class_name = 'OnPolicyDaggerRunner'
-        max_iterations = 20000
+        max_iterations = 50000
         warm_iters = 100
 
-        save_interval = 100
+        save_interval = 50
         experiment_name = 'test'
         run_name = ''
         resume = False

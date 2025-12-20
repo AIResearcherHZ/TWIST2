@@ -161,16 +161,16 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
         # All reward scales can be set to None to completely disable that reward
         # Set any scale to None to skip computing that reward entirely
         class scales:
-            tracking_joint_dof = 2.0  # Set to None to disable
-            tracking_joint_vel = 0.2  # Set to None to disable
-            tracking_root_translation_z = 1.0  # Set to None to disable
-            tracking_root_rotation = 1.0  # Set to None to disable
-            tracking_root_linear_vel = 1.0  # Set to None to disable
-            tracking_root_angular_vel = 1.0  # Set to None to disable
-            tracking_keybody_pos = 2.0  # Set to None to disable
-            tracking_keybody_pos_global = 2.0  # Set to None to disable
-            alive = 0.5  # Set to None to disable
-            feet_slip = -0.1  # Set to None to disable
+            tracking_joint_dof = 2.22  # Set to None to disable
+            tracking_joint_vel = 0.222  # Set to None to disable
+            tracking_root_translation_z = 1.22  # Set to None to disable
+            tracking_root_rotation = 1.22  # Set to None to disable
+            tracking_root_linear_vel = 1.22  # Set to None to disable
+            tracking_root_angular_vel = 1.22  # Set to None to disable
+            tracking_keybody_pos = 2.22  # Set to None to disable
+            tracking_keybody_pos_global = 2.22  # Set to None to disable
+            alive = 0.522  # Set to None to disable
+            feet_slip = -0.122  # Set to None to disable
             feet_contact_forces = -5e-4  # Set to None to disable
             feet_stumble = -1.25  # Set to None to disable
             dof_pos_limits = -5.0  # Set to None to disable
@@ -182,11 +182,18 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             ang_vel_xy = -0.02  # Set to None to disable
             ankle_dof_acc = -1e-7 * 2  # Set to None to disable
             ankle_dof_vel = -1e-4 * 2  # Set to None to disable
+            
+            # 脚掌着地奖励和脚掌roll/pitch保持不动惩罚
+            # feet_flat_contact = 2.0  # 脚掌全部着地奖励
+            # ankle_roll_pitch_penalty = -0.1 # 脚掌roll/pitch偏离惩罚
+            
+            # 头部neck三关节保持不动惩罚
+            neck_dof_penalty = -0.25  # neck三关节偏离惩罚
 
-            # 未来动作一致性奖励（只在训练时生效）- Set to None to disable
-            future_action_consistency = 1.0  # Set to None to disable
-            future_yaw_consistency = 0.1  # Set to None to disable
-            turning_smoothness = -0.05  # Set to None to disable
+            # # 未来动作一致性奖励（只在训练时生效）- Set to None to disable
+            # future_action_consistency = 1.0  # Set to None to disable
+            # future_yaw_consistency = 0.1  # Set to None to disable
+            # turning_smoothness = -0.05  # Set to None to disable
 
 
 class TaksT1MimicStuFutureCfgDAgger(TaksT1MimicStuFutureCfg):
@@ -199,10 +206,10 @@ class TaksT1MimicStuFutureCfgDAgger(TaksT1MimicStuFutureCfg):
         policy_class_name = 'ActorCriticFuture'
         algorithm_class_name = 'DaggerPPO'
         runner_class_name = 'OnPolicyDaggerRunner'
-        max_iterations = 10000
+        max_iterations = 50000
         warm_iters = 100
 
-        save_interval = 100
+        save_interval = 50
         experiment_name = 'test'
         run_name = ''
         resume = False

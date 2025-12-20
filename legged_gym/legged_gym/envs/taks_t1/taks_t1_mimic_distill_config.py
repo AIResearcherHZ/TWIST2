@@ -368,7 +368,7 @@ class TaksT1MimicPrivCfgPPO(HumanoidMimicCfgPPO):
         runner_class_name = 'OnPolicyRunnerMimic'
         max_iterations = 1000001
 
-        save_interval = 100
+        save_interval = 50
         experiment_name = 'test'
         run_name = ''
         resume = False
@@ -405,7 +405,7 @@ class TaksT1MimicStuCfgDAgger(TaksT1MimicPrivCfgPPO):
         max_iterations = 1000001
         warm_iters = 100
         
-        save_interval = 100
+        save_interval = 50
         experiment_name = 'test'
         run_name = ''
         resume = False
@@ -444,7 +444,7 @@ class TaksT1MimicStuRLCfgDAgger(TaksT1MimicStuRLCfg):
         max_iterations = 1000001
         warm_iters = 100
         
-        save_interval = 100
+        save_interval = 50
         experiment_name = 'test'
         run_name = ''
         resume = False

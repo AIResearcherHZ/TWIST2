@@ -320,10 +320,10 @@ class HumanoidCfgPPO(BaseConfig):
         algorithm_class_name = 'PPO'
         runner_class_name = 'OnPolicyRunner'
         num_steps_per_env = 24 # per iteration
-        max_iterations = 20000 # number of policy updates
+        max_iterations = 50000 # number of policy updates
 
         # logging
-        save_interval = 100 # check for potential saves every this many iterations
+        save_interval = 50 # check for potential saves every this many iterations
         experiment_name = 'test'
         run_name = ''
         # load and resume
