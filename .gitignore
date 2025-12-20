@@ -17,6 +17,10 @@ ignore/
 
 track_dataset/
 
+# 允许特定的logs子目录
+!legged_gym/logs_backup/
+!legged_gym/logs/taks_t1_stu_future/
+
 *.pt
 *.log
 
