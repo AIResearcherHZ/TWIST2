@@ -27,30 +27,30 @@ bash run_motion_server.sh taks_t1
 =================================================================================
 
 【单卡训练】
-bash train.sh 1220_taks_t1 cuda:0 g1 8000
-bash train.sh 1220_taks_t1 cuda:0 taks_t1 8000
+bash train.sh 1221_taks_t1 cuda:0 g1 8000
+bash train.sh 1221_taks_t1 cuda:0 taks_t1 8000
 
 【评估】
-bash eval.sh 1220_taks_t1 cuda:0 g1 4
-bash eval.sh 1220_taks_t1 cuda:0 taks_t1 4
+bash eval.sh 1221_taks_t1 cuda:0 g1 4
+bash eval.sh 1221_taks_t1 cuda:0 taks_t1 4
 
 【导出 ONNX】
-bash to_onnx.sh g1 legged_gym/logs/g1_stu_future/1220_taks_t1/model_13128.pt
-bash to_onnx.sh taks_t1 legged_gym/logs/taks_t1_stu_future/1220_taks_t1/model_100.pt
+bash to_onnx.sh g1 legged_gym/logs/g1_stu_future/1221_taks_t1/model_13128.pt
+bash to_onnx.sh taks_t1 legged_gym/logs/taks_t1_stu_future/1221_taks_t1/model_100.pt
 
 【SIM2SIM（ONNX 回放/对齐验证）】
-bash sim2sim.sh g1 legged_gym/logs/g1_stu_future/1220_taks_t1/model_13128.onnx
-bash sim2sim.sh taks_t1 legged_gym/logs/taks_t1_stu_future/1220_taks_t1/model_100.onnx
+bash sim2sim.sh g1 legged_gym/logs/g1_stu_future/1221_taks_t1/model_13128.onnx
+bash sim2sim.sh taks_t1 legged_gym/logs/taks_t1_stu_future/1221_taks_t1/model_100.onnx
 
 【单机多 GPU 训练】
 说明：脚本会将 total_envs 平均分到每张 GPU（不整除会自动向下取整到可均分的总数）。
 
 1) 自动检测 GPU 数量
-bash train_multigpu.sh 1220_taks_t1
+bash train_multigpu.sh 1221_taks_t1
 
 2) 指定 GPU 数量和总环境数
-bash train_multigpu.sh 1220_taks_t1 3 24000
-bash train_multigpu.sh 1220_taks_t1 4 31961
+bash train_multigpu.sh 1221_taks_t1 3 24000
+bash train_multigpu.sh 1221_taks_t1 4 31961
 
 ================================================================================
                          Gym 可视化：彩色点含义（调试用）

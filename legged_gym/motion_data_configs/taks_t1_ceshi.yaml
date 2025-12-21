@@ -1,0 +1,5 @@
+root_path: ../../../GMR/data/TWIST2_dataset/
+motions:
+- file: example_motions_taks_t1/multitask_taks_t1.pkl
+  weight: 1.0
+  description: general movement
