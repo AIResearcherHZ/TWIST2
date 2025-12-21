@@ -32,5 +32,5 @@ python train.py --task "${task_name}" \
                 --exptid "${exptid}" \
                 --device "${device}" \
                 --teacher_exptid "None" \
-                --resume \
-                --debug  # 调试模式（可视化）
+                --resume
+                # --debug  # 调试模式（可视化）
