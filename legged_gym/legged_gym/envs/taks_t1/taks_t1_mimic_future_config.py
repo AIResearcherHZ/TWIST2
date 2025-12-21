@@ -171,8 +171,8 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             tracking_keybody_pos_global = 2.22  # Set to None to disable
             alive = 0.522  # Set to None to disable
             feet_slip = -0.122  # Set to None to disable
-            feet_contact_forces = -2.5e-4  # Set to None to disable
-            feet_stumble = -1.5  # Set to None to disable
+            feet_contact_forces = -5e-4  # Set to None to disable
+            feet_stumble = -1.25  # Set to None to disable
             dof_pos_limits = -5.0  # Set to None to disable
             dof_torque_limits = -1.0  # Set to None to disable
             dof_vel = -1e-4  # Set to None to disable
