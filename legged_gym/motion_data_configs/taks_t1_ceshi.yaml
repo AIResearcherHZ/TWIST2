@@ -58278,3 +58278,6 @@ motions:
 - file: twist1_to_twist2_taks_t1/transitions_walksideways_walkbackwards.pkl
   weight: 1.0
   description: general movement
+- file: example_motions_taks_t1/multitask_taks_t1.pkl
+  weight: 1.0
+  description: general movement
