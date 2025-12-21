@@ -95886,3 +95886,234 @@ motions:
 - file: example_motions_taks_t1/multitask_taks_t1.pkl
   weight: 1.0
   description: general movement
+- file: lafan1_taks_t1/aiming1_subject1.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/aiming1_subject4.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/aiming2_subject2.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/aiming2_subject3.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/aiming2_subject5.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/dance1_subject1.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/dance1_subject2.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/dance1_subject3.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/dance2_subject1.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/dance2_subject2.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/dance2_subject3.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/dance2_subject4.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/dance2_subject5.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/fallAndGetUp1_subject1.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/fallAndGetUp1_subject4.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/fallAndGetUp1_subject5.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/fallAndGetUp2_subject2.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/fallAndGetUp2_subject3.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/fallAndGetUp3_subject1.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/fight1_subject2.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/fight1_subject3.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/fight1_subject5.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/fightAndSports1_subject1.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/fightAndSports1_subject4.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/ground1_subject1.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/ground1_subject4.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/ground1_subject5.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/ground2_subject2.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/ground2_subject3.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/jumps1_subject1.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/jumps1_subject2.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/jumps1_subject5.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/multipleActions1_subject1.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/multipleActions1_subject2.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/multipleActions1_subject3.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/multipleActions1_subject4.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/obstacles1_subject1.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/obstacles1_subject2.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/obstacles1_subject5.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/obstacles2_subject1.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/obstacles2_subject2.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/obstacles2_subject5.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/obstacles3_subject3.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/obstacles3_subject4.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/obstacles4_subject2.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/obstacles4_subject3.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/obstacles4_subject4.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/obstacles5_subject2.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/obstacles5_subject3.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/obstacles5_subject4.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/obstacles6_subject1.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/obstacles6_subject4.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/obstacles6_subject5.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/push1_subject2.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/pushAndFall1_subject1.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/pushAndFall1_subject4.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/pushAndStumble1_subject2.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/pushAndStumble1_subject3.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/pushAndStumble1_subject5.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/run1_subject2.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/run1_subject5.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/run2_subject1.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/run2_subject4.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/sprint1_subject2.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/sprint1_subject4.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/walk1_subject1.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/walk1_subject2.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/walk1_subject5.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/walk2_subject1.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/walk2_subject3.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/walk2_subject4.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/walk3_subject1.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/walk3_subject2.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/walk3_subject3.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/walk3_subject4.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/walk3_subject5.pkl
+  weight: 1.0
+  description: general movement
+- file: lafan1_taks_t1/walk4_subject1.pkl
+  weight: 1.0
+  description: general movement

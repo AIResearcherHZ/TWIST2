@@ -60,7 +60,7 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             only_apply_resistance_when_walking = True
 
     class motion(TaksT1MimicPrivCfg.motion):
-        motion_file = f"{LEGGED_GYM_ROOT_DIR}/motion_data_configs/taks_t1.yaml"
+        motion_file = f"{LEGGED_GYM_ROOT_DIR}/motion_data_configs/taks_t1_ceshi.yaml"
         # Set to None to completely disable motion curriculum
         motion_curriculum = True  # Set to None/False to disable
         motion_curriculum_gamma = 0.01
@@ -180,8 +180,8 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             action_rate = -0.1  # Set to None to disable
             feet_air_time = 5.22  # Set to None to disable
             ang_vel_xy = -0.02  # Set to None to disable
-            ankle_dof_acc = -1e-7 * 10  # Set to None to disable(原来是*2)
-            ankle_dof_vel = -1e-4 * 10  # Set to None to disable(原来是*2)
+            ankle_dof_acc = -1e-7 * 2  # Set to None to disable(原来是*2)
+            ankle_dof_vel = -1e-4 * 2  # Set to None to disable(原来是*2)
             
             # 脚掌着地奖励和脚掌roll/pitch保持不动惩罚
             # feet_flat_contact = 2.0  # 脚掌全部着地奖励
@@ -190,10 +190,10 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             # 头部neck三关节保持不动惩罚
             neck_dof_penalty = -0.35  # neck三关节偏离惩罚
 
-            # # 未来动作一致性奖励（只在训练时生效）- Set to None to disable
-            # future_action_consistency = 1.5  # Set to None to disable
-            # future_yaw_consistency = 0.1  # Set to None to disable
-            # turning_smoothness = -0.05  # Set to None to disable
+            # 未来动作一致性奖励（只在训练时生效）- Set to None to disable
+            future_action_consistency = 1.5  # Set to None to disable
+            future_yaw_consistency = 0.1  # Set to None to disable
+            turning_smoothness = -0.05  # Set to None to disable
 
 
 class TaksT1MimicStuFutureCfgDAgger(TaksT1MimicStuFutureCfg):
