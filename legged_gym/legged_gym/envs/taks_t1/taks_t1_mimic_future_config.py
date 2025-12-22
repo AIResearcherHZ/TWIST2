@@ -108,25 +108,6 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
         action_delay = (True and domain_rand_general)
         action_buf_len = 8
 
-        # 动作噪声
-        action_noise = (True and domain_rand_general)
-        action_noise_std = 0.01
-
-        # 关节编码器噪声
-        encoder_noise = (True and domain_rand_general)
-        encoder_pos_noise_std = 0.005
-        encoder_vel_noise_std = 0.01
-        encoder_pos_bias_range = [-0.01, 0.01]
-        encoder_vel_bias_range = [-0.02, 0.02]
-
-        # IMU噪声和漂移
-        imu_noise = (True and domain_rand_general)
-        imu_ang_vel_noise_std = 0.02
-        imu_lin_acc_noise_std = 0.05
-        imu_ang_vel_bias_range = [-0.1, 0.1]
-        imu_lin_acc_bias_range = [-0.2, 0.2]
-        imu_bias_drift_std = 0.01
-
         # 观测丢包
         observation_dropout = (True and domain_rand_general)
         observation_dropout_prob = 0.001
@@ -142,12 +123,6 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
         sensor_latency_spike = (True and domain_rand_general)
         sensor_latency_spike_prob = 0.001
         sensor_latency_max_steps = 10
-
-        # 重力方向偏置
-        slope_randomization = (True and domain_rand_general)
-        gravity_bias_x_range = [-0.1, 0.1]
-        gravity_bias_y_range = [-0.1, 0.1]
-        gravity_bias_z_range = [-0.05, 0.05]
         
         # 惯量随机化 - 模拟电机转子惯量不确定性
         randomize_armature = (True and domain_rand_general)
@@ -161,16 +136,16 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
         # All reward scales can be set to None to completely disable that reward
         # Set any scale to None to skip computing that reward entirely
         class scales:
-            tracking_joint_dof = 2.22  # Set to None to disable
-            tracking_joint_vel = 0.222  # Set to None to disable
-            tracking_root_translation_z = 1.22  # Set to None to disable
-            tracking_root_rotation = 1.22  # Set to None to disable
-            tracking_root_linear_vel = 1.22  # Set to None to disable
-            tracking_root_angular_vel = 1.22  # Set to None to disable
-            tracking_keybody_pos = 2.22  # Set to None to disable
-            tracking_keybody_pos_global = 2.22  # Set to None to disable
-            alive = 0.522  # Set to None to disable
-            feet_slip = -0.122  # Set to None to disable
+            tracking_joint_dof = 2.55  # Set to None to disable
+            tracking_joint_vel = 0.255  # Set to None to disable
+            tracking_root_translation_z = 1.55  # Set to None to disable
+            tracking_root_rotation = 1.55  # Set to None to disable
+            tracking_root_linear_vel = 1.55  # Set to None to disable
+            tracking_root_angular_vel = 1.55  # Set to None to disable
+            tracking_keybody_pos = 2.55  # Set to None to disable
+            tracking_keybody_pos_global = 2.55  # Set to None to disable
+            alive = 0.555  # Set to None to disable
+            feet_slip = -0.155  # Set to None to disable
             feet_contact_forces = -5e-4  # Set to None to disable
             feet_stumble = -1.25  # Set to None to disable
             dof_pos_limits = -5.0  # Set to None to disable
@@ -178,7 +153,7 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             dof_vel = -1e-4  # Set to None to disable
             dof_acc = -1e-7  # Set to None to disable
             action_rate = -0.1  # Set to None to disable
-            feet_air_time = 5.22  # Set to None to disable
+            feet_air_time = 5.55  # Set to None to disable
             ang_vel_xy = -0.02  # Set to None to disable
             ankle_dof_acc = -1e-7 * 2  # Set to None to disable(原来是*2)
             ankle_dof_vel = -1e-4 * 2  # Set to None to disable(原来是*2)
@@ -188,7 +163,7 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             # ankle_roll_pitch_penalty = -0.1 # 脚掌roll/pitch偏离惩罚
             
             # 头部neck三关节保持不动惩罚
-            neck_dof_penalty = -0.35  # neck三关节偏离惩罚
+            neck_dof_penalty = -0.55  # neck三关节偏离惩罚
 
             # 未来动作一致性奖励（只在训练时生效）- Set to None to disable
             future_action_consistency = 1.5  # Set to None to disable

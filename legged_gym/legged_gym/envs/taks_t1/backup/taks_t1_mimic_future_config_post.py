@@ -108,25 +108,6 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
         action_delay = (True and domain_rand_general)
         action_buf_len = 8
 
-        # 动作噪声
-        action_noise = (True and domain_rand_general)
-        action_noise_std = 0.01
-
-        # 关节编码器噪声
-        encoder_noise = (True and domain_rand_general)
-        encoder_pos_noise_std = 0.005
-        encoder_vel_noise_std = 0.01
-        encoder_pos_bias_range = [-0.01, 0.01]
-        encoder_vel_bias_range = [-0.02, 0.02]
-
-        # IMU噪声和漂移
-        imu_noise = (True and domain_rand_general)
-        imu_ang_vel_noise_std = 0.02
-        imu_lin_acc_noise_std = 0.05
-        imu_ang_vel_bias_range = [-0.1, 0.1]
-        imu_lin_acc_bias_range = [-0.2, 0.2]
-        imu_bias_drift_std = 0.01
-
         # 观测丢包
         observation_dropout = (True and domain_rand_general)
         observation_dropout_prob = 0.001
@@ -142,12 +123,6 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
         sensor_latency_spike = (True and domain_rand_general)
         sensor_latency_spike_prob = 0.001
         sensor_latency_max_steps = 10
-
-        # 重力方向偏置
-        slope_randomization = (True and domain_rand_general)
-        gravity_bias_x_range = [-0.1, 0.1]
-        gravity_bias_y_range = [-0.1, 0.1]
-        gravity_bias_z_range = [-0.05, 0.05]
         
         # 惯量随机化 - 模拟电机转子惯量不确定性
         randomize_armature = (True and domain_rand_general)
