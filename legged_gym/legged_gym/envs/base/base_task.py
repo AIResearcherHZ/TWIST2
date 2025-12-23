@@ -199,7 +199,7 @@ class BaseTask():
                 if evt.action == "pause" and evt.value > 0:
                     self.pause = True
                     while self.pause:
-                        time.sleep(0.1)
+                        time.sleep(0.01)
                         self.gym.draw_viewer(self.viewer, self.sim, True)
                         for evt in self.gym.query_viewer_action_events(self.viewer):
                             if evt.action == "pause" and evt.value > 0:

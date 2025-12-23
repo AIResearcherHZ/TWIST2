@@ -259,7 +259,7 @@ def main(args, xml_file, robot_base):
         redis_client.set(f"action_body_{args.robot}", json.dumps(target_mimic_obs.tolist()))
         last_mimic_obs = target_mimic_obs
         viewer.close()
-        time.sleep(0.5)
+        time.sleep(0.01)
         exit()
     finally:
         print("[Motion Server] Exiting...Interpolating to default mimic_obs...")
@@ -273,7 +273,7 @@ def main(args, xml_file, robot_base):
         redis_client.set(f"action_body_{args.robot}", json.dumps(target_mimic_obs.tolist()))
         last_mimic_obs = target_mimic_obs
         viewer.close()
-        time.sleep(0.5)
+        time.sleep(0.01)
         exit()
     
 

@@ -165,6 +165,6 @@ if __name__ == "__main__":
         # get hand state
         left_hand_state, right_hand_state = hand_ctrl.get_hand_state()
         print(f"Step {i}: Left [{left_hand_state[0]:.3f}, {left_hand_state[1]:.3f}, {left_hand_state[2]:.3f}] Right [{right_hand_state[0]:.3f}, {right_hand_state[1]:.3f}, {right_hand_state[2]:.3f}]")
-        time.sleep(0.1)
+        time.sleep(0.01)
     
     print("✅ Test completed! New unified API is working perfectly.")

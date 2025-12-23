@@ -226,7 +226,7 @@ def main(args):
                         cv2.waitKey(1)
                 else:
                     # For keyboard mode, just sleep to avoid busy waiting
-                    time.sleep(0.1)
+                    time.sleep(0.01)
                     
     except KeyboardInterrupt:
         print("\nReceived Ctrl+C, exiting...")

@@ -186,4 +186,4 @@ if __name__ == "__main__":
         fps = 1 / (end_time - start_time)
         print(f"FPS: {fps:.2f}")
         start_time = end_time
-        time.sleep(0.1)
+        time.sleep(0.01)
