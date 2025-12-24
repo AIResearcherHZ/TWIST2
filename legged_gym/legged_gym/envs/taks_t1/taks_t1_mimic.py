@@ -261,3 +261,19 @@ class TaksT1Mimic(HumanoidMimic):
         Encourages the robot to stay still when it has reached the target pose."""
         joint_vel_magnitude = torch.sum(torch.square(self.dof_vel), dim=1)
         return joint_vel_magnitude
+
+    def _reward_pelvis_lin_acc(self):
+        """Penalize pelvis linear acceleration to encourage smooth motion.
+        Uses pre-computed base_lin_acc for GPU efficiency."""
+        return torch.sum(torch.square(self.base_lin_acc), dim=1)
+
+    def _reward_pelvis_ang_acc(self):
+        """Penalize pelvis angular acceleration to encourage smooth rotation.
+        Computes angular acceleration from last_root_vel."""
+        ang_acc = (self.root_states[:, 10:13] - self.last_root_vel[:, 3:6]) / self.dt
+        return torch.sum(torch.square(ang_acc), dim=1)
+
+    def _reward_flat_orientation(self):
+        """Penalize non-flat base orientation (roll and pitch).
+        Uses projected_gravity which is already computed for GPU efficiency."""
+        return torch.sum(torch.square(self.projected_gravity[:, :2]), dim=1)

@@ -310,7 +310,7 @@ class TaksT1MimicPrivCfg(HumanoidMimicCfg):
         motion_smooth = True
         motion_decompose = False
 
-        motion_file = f"{LEGGED_GYM_ROOT_DIR}/motion_data_configs/taks_t1_ceshi.yaml"
+        motion_file = f"{LEGGED_GYM_ROOT_DIR}/motion_data_configs/taks_t1_demo.yaml"
 
 
 class TaksT1MimicStuCfg(TaksT1MimicPrivCfg):

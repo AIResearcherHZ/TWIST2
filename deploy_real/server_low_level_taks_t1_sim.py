@@ -11,6 +11,7 @@ import mujoco.viewer as mjv
 from tqdm import tqdm
 import os
 from data_utils.rot_utils import quatToEuler
+from robot_control.fall_detector import FallDetector, FallProtectionController
 
 try:
     import onnxruntime as ort
@@ -65,6 +66,9 @@ class RealTimePolicyController:
                  measure_fps=False,
                  limit_fps=True,
                  policy_frequency=50,
+                 fall_protection=True,
+                 fall_roll_threshold=1.0,
+                 fall_pitch_threshold=1.0,
                  ):
         self.measure_fps = measure_fps
         self.limit_fps = limit_fps
@@ -251,6 +255,20 @@ class RealTimePolicyController:
         self.record_proprio = record_proprio
         self.proprio_recordings = [] if record_proprio else None
         
+        # Fall protection
+        self.fall_protection_enabled = fall_protection
+        if fall_protection:
+            self.fall_detector = FallDetector(
+                roll_threshold=fall_roll_threshold,
+                pitch_threshold=fall_pitch_threshold,
+                detection_window=5,
+                detection_ratio=0.6
+            )
+            self.fall_controller = FallProtectionController(self.fall_detector)
+            print(f"Fall protection enabled: roll_threshold={np.degrees(fall_roll_threshold):.1f}°, pitch_threshold={np.degrees(fall_pitch_threshold):.1f}°")
+        else:
+            self.fall_detector = None
+            self.fall_controller = None
 
     def reset_sim(self):
         """Reset simulation to initial state"""
@@ -307,6 +325,11 @@ class RealTimePolicyController:
         policy_execution_times = []
         policy_step_count = 0
         policy_fps_print_interval = 100
+        
+        # Initialize fall protection scales
+        kp_scale = 1.0
+        kd_scale = 1.0
+        pd_target = self.default_dof_pos.copy()
 
         try:
             for i in pbar:
@@ -427,6 +450,14 @@ class RealTimePolicyController:
                     raw_action = np.clip(raw_action, -10., 10.)
                     scaled_actions = raw_action * self.action_scale
                     pd_target = scaled_actions + self.default_dof_pos
+                    
+                    # Fall protection check
+                    kp_scale = 1.0
+                    kd_scale = 1.0
+                    if self.fall_protection_enabled and self.fall_controller:
+                        kp_scale, kd_scale, is_fallen = self.fall_controller.check_and_protect_from_rpy(rpy[0], rpy[1])
+                        if is_fallen:
+                            pd_target = dof_pos  # 保持当前位置
 
                     # self.redis_client.set("action_low_level_unitree_g1", json.dumps(raw_action.tolist()))
                     
@@ -452,8 +483,8 @@ class RealTimePolicyController:
                         self.proprio_recordings.append(proprio_data)
 
                
-                # PD control
-                torque = (pd_target - dof_pos) * self.stiffness - dof_vel * self.damping
+                # PD control with fall protection scaling
+                torque = (pd_target - dof_pos) * self.stiffness * kp_scale - dof_vel * self.damping * kd_scale
                 torque = np.clip(torque, -self.torque_limits, self.torque_limits)
                 
                 self.data.ctrl[:] = torque
@@ -503,7 +534,18 @@ def main():
     parser.add_argument("--measure_fps", help="Measure FPS", default=0, type=int)
     parser.add_argument("--limit_fps", help="Limit FPS with sleep", default=1, type=int)
     parser.add_argument("--policy_frequency", help="Policy frequency", default=100, type=int)
+    parser.add_argument('--fall_protection', action='store_true', default=True,
+                        help='Enable fall protection')
+    parser.add_argument('--no_fall_protection', action='store_true',
+                        help='Disable fall protection')
+    parser.add_argument('--fall_roll_threshold', type=float, default=1.0,
+                        help='Fall detection roll threshold in radians (default: 1.0 rad = 57 deg)')
+    parser.add_argument('--fall_pitch_threshold', type=float, default=1.0,
+                        help='Fall detection pitch threshold in radians (default: 1.0 rad = 57 deg)')
     args = parser.parse_args()
+    
+    # Handle fall protection flag
+    fall_protection = not args.no_fall_protection
     
     # Verify policy file exists
     if not os.path.exists(args.policy):
@@ -523,6 +565,10 @@ def main():
     print(f"  Record proprio: {args.record_proprio}")
     print(f"  Measure FPS: {args.measure_fps}")
     print(f"  Limit FPS: {args.limit_fps}")
+    print(f"  Fall protection: {fall_protection}")
+    if fall_protection:
+        print(f"  Fall roll threshold: {np.degrees(args.fall_roll_threshold):.1f} deg")
+        print(f"  Fall pitch threshold: {np.degrees(args.fall_pitch_threshold):.1f} deg")
     controller = RealTimePolicyController(
         xml_file=args.xml,
         policy_path=args.policy,
@@ -532,6 +578,9 @@ def main():
         measure_fps=args.measure_fps,
         limit_fps=args.limit_fps,
         policy_frequency=args.policy_frequency,
+        fall_protection=fall_protection,
+        fall_roll_threshold=args.fall_roll_threshold,
+        fall_pitch_threshold=args.fall_pitch_threshold,
     )
     controller.run()
 

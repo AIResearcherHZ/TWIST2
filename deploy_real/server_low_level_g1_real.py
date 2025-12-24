@@ -15,6 +15,7 @@ import os
 from data_utils.rot_utils import quatToEuler
 
 from robot_control.dex_hand_wrapper import Dex3_1_Controller
+from robot_control.fall_detector import FallDetector, FallProtectionController
 
 try:
     import onnxruntime as ort
@@ -101,7 +102,10 @@ class RealTimePolicyController(object):
                  net='eno1',
                  use_hand=False,
                  record_proprio=False,
-                 smooth_body=0.0):
+                 smooth_body=0.0,
+                 fall_protection=True,
+                 fall_roll_threshold=1.0,
+                 fall_pitch_threshold=1.0):
         self.redis_client = None
         try:
             self.redis_client = redis.Redis(host='localhost', port=6379, db=0)
@@ -162,6 +166,21 @@ class RealTimePolicyController(object):
             print(f"Body action smoothing enabled with alpha={smooth_body}")
         else:
             self.body_smoother = None
+        
+        # Fall protection
+        self.fall_protection_enabled = fall_protection
+        if fall_protection:
+            self.fall_detector = FallDetector(
+                roll_threshold=fall_roll_threshold,
+                pitch_threshold=fall_pitch_threshold,
+                detection_window=5,
+                detection_ratio=0.6
+            )
+            self.fall_controller = FallProtectionController(self.fall_detector)
+            print(f"Fall protection enabled: roll_threshold={np.degrees(fall_roll_threshold):.1f}°, pitch_threshold={np.degrees(fall_pitch_threshold):.1f}°")
+        else:
+            self.fall_detector = None
+            self.fall_controller = None
 
         
     def reset_robot(self):
@@ -275,6 +294,14 @@ class RealTimePolicyController(object):
 
                 kp_scale = 1.0
                 kd_scale = 1.0
+                
+                # Fall protection check
+                if self.fall_protection_enabled and self.fall_controller:
+                    kp_scale, kd_scale, is_fallen = self.fall_controller.check_and_protect_from_rpy(rpy[0], rpy[1])
+                    if is_fallen:
+                        # 跌倒后停止policy，只发送零力矩命令
+                        target_dof_pos = dof_pos  # 保持当前位置
+                
                 self.env.send_robot_action(target_dof_pos, kp_scale, kd_scale)
                 
                 if self.use_hand:
@@ -338,8 +365,19 @@ def main():
                         help='Record proprioceptive data')
     parser.add_argument('--smooth_body', type=float, default=0.0,
                         help='Smoothing factor for body actions (0.0=no smoothing, 1.0=maximum smoothing)')
+    parser.add_argument('--fall_protection', action='store_true', default=True,
+                        help='Enable fall protection')
+    parser.add_argument('--no_fall_protection', action='store_true',
+                        help='Disable fall protection')
+    parser.add_argument('--fall_roll_threshold', type=float, default=1.0,
+                        help='Fall detection roll threshold in radians (default: 1.0 rad = 57 deg)')
+    parser.add_argument('--fall_pitch_threshold', type=float, default=1.0,
+                        help='Fall detection pitch threshold in radians (default: 1.0 rad = 57 deg)')
     
     args = parser.parse_args()
+    
+    # Handle fall protection flag
+    fall_protection = not args.no_fall_protection
 
     
     # 验证文件存在
@@ -359,6 +397,10 @@ def main():
     print(f"  Use hand: {args.use_hand}")
     print(f"  Record proprio: {args.record_proprio}")
     print(f"  Smooth body: {args.smooth_body}")
+    print(f"  Fall protection: {fall_protection}")
+    if fall_protection:
+        print(f"  Fall roll threshold: {np.degrees(args.fall_roll_threshold):.1f} deg")
+        print(f"  Fall pitch threshold: {np.degrees(args.fall_pitch_threshold):.1f} deg")
     
     # 安全提示
     print("\n" + "="*50)
@@ -377,6 +419,9 @@ def main():
         use_hand=args.use_hand,
         record_proprio=args.record_proprio,
         smooth_body=args.smooth_body,
+        fall_protection=fall_protection,
+        fall_roll_threshold=args.fall_roll_threshold,
+        fall_pitch_threshold=args.fall_pitch_threshold,
     )
     
     controller.run()
