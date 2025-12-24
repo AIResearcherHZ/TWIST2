@@ -60,7 +60,7 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             only_apply_resistance_when_walking = True
 
     class motion(TaksT1MimicPrivCfg.motion):
-        motion_file = f"{LEGGED_GYM_ROOT_DIR}/motion_data_configs/taks_t1_demo.yaml"
+        motion_file = f"{LEGGED_GYM_ROOT_DIR}/motion_data_configs/taks_t1_ceshi.yaml"
         # Set to None to completely disable motion curriculum
         motion_curriculum = True  # Set to None/False to disable
         motion_curriculum_gamma = 0.01
@@ -166,8 +166,8 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             neck_dof_penalty = -0.5  # neck三关节偏离惩罚
             
             # 骨盆加速度约束 - 鼓励平滑运动
-            pelvis_lin_acc = -1e-6  # 骨盆线性加速度惩罚
-            pelvis_ang_acc = -1e-6  # 骨盆角加速度惩罚
+            pelvis_lin_acc = -5e-7  # 骨盆线性加速度惩罚
+            pelvis_ang_acc = -1e-7  # 骨盆角加速度惩罚
             
             # 姿态保持 - 保持躯干平坦
             flat_orientation = -0.5  # roll/pitch偏离惩罚

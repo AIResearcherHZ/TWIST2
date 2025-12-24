@@ -12,7 +12,8 @@ robot_type="${1:-unitree_g1_with_hands}"
 # Select motion file based on robot type
 if [ "$robot_type" == "taks_t1" ]; then
     # Taks_T1 uses 32 DOF motion files
-    motion_file="../../GMR/data/TWIST2_dataset/example_motions_taks_t1/0807_yanjie_walk_001.pkl"
+    # motion_file="../../GMR/data/TWIST2_dataset/example_motions_taks_t1/0807_yanjie_walk_001.pkl"
+    motion_file="../../GMR/data/TWIST2_dataset/v1_v2_v3_taks_t1/0811_static_001.pkl"
 else
     # G1 uses 29 DOF motion files
     motion_file="../../GMR/data/TWIST2_dataset/example_motions_g1/0807_yanjie_walk_001.pkl"
