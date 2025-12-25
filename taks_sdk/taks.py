@@ -11,6 +11,7 @@ Taks SDK - ZeroMQ 客户端库（同步版）
 import zmq
 import struct
 import threading
+import time
 from typing import List, Optional, Dict, Callable
 from enum import IntEnum
 
@@ -20,6 +21,8 @@ DEVICE_PREFIXES = {
     "Taks-T1-leftarm": bytes([0xC7, 0xE9, 0x67, 0x34, 0x6A, 0x97]),
     "Taks-T1-rightarm": bytes([0xC7, 0xE9, 0x67, 0x34, 0x6B, 0x0A]),
     "Taks-T1-semibody": bytes([0xC7, 0xE9, 0x67, 0x34, 0x6B, 0x08]),
+    "Taks-T1-rightgripper": bytes([0xC7, 0xE9, 0x67, 0x34, 0x6C, 0xC3]),
+    "Taks-T1-leftgripper": bytes([0xC7, 0xE9, 0x67, 0x34, 0x6C, 0x50]),
     "Taks-T1-imu": bytes([0xC7, 0xE9, 0x67, 0x34, 0x68, 0xF7]),
 }
 
@@ -54,6 +57,13 @@ _recv_thread: Optional[threading.Thread] = None
 _running: bool = False
 _lock = threading.Lock()
 
+# ============ 发送频率控制 ============
+_send_freq_limit: float =10.0
+_last_send_time: float = 0.0
+_send_count: int = 0
+_send_start_time: float = 0.0
+_freq_print_interval: int = 50  # 每50次打印一次频率
+
 # ============ 二进制协议编解码 ============
 def _encode_position(joints: Dict[int, float]) -> bytes:
     buf = bytearray([CMD.POS_CTRL, len(joints)])
@@ -64,11 +74,13 @@ def _encode_position(joints: Dict[int, float]) -> bytes:
 def _encode_mit(joints: Dict[int, Dict]) -> bytes:
     buf = bytearray([CMD.MIT_CTRL, len(joints)])
     nan = float('nan')
+    
     for jid, p in joints.items():
         kp = p.get('kp') if p.get('kp') is not None else nan
         kd = p.get('kd') if p.get('kd') is not None else nan
         q, dq, tau = p.get('q', 0), p.get('dq', 0), p.get('tau', 0)
         buf.extend(struct.pack('Bfffff', jid, kp, kd, q, dq, tau))
+    
     return bytes(buf)
 
 def _encode_query(cmd_type: int, jids: List[int] = None) -> bytes:
@@ -207,9 +219,42 @@ def _send_and_wait(prefix: bytes, payload: bytes, timeout: float = 1.0) -> Dict:
 
 def _send_fire_and_forget(prefix: bytes, payload: bytes):
     """发送命令，不等待响应（高频控制用）"""
+    global _last_send_time, _send_count, _send_start_time
+    
     if not _dealer:
         raise RuntimeError("未连接，请先调用 connect()")
+    
+    # 频率限制
+    current_time = time.time()
+    if _send_freq_limit > 0 and _last_send_time > 0:
+        min_interval = 1.0 / _send_freq_limit
+        time_since_last = current_time - _last_send_time
+        if time_since_last < min_interval:
+            sleep_time = min_interval - time_since_last
+            time.sleep(sleep_time)
+            current_time = time.time()
+    
+    # 记录发送前时间用于计算瞬时频率
+    prev_send_time = _last_send_time if _last_send_time > 0 else current_time
+    
+    # 发送数据
     _dealer.send_multipart([b'', prefix + payload], zmq.NOBLOCK)
+    
+    # 统计频率
+    if _send_count == 0:
+        _send_start_time = current_time
+    _send_count += 1
+    _last_send_time = current_time
+    
+    # 定期打印频率
+    if _send_count % _freq_print_interval == 0:
+        elapsed = current_time - _send_start_time
+        if elapsed > 0:
+            avg_freq = _send_count / elapsed
+            # 瞬时频率：使用本次和上次发送的时间差
+            time_diff = current_time - prev_send_time
+            instant_freq = 1.0 / time_diff if time_diff > 1e-6 else 0
+            print(f"[发送频率] 平均: {avg_freq:.2f} Hz | 瞬时: {instant_freq:.2f} Hz | 总计: {_send_count} 次")
 
 # ============ 客户端API类 ============
 class JointControl:
@@ -373,6 +418,11 @@ class IMUDevice:
         if not _dealer:
             raise RuntimeError("请先调用 connect() 连接网络")
     
+    def _register(self):
+        """注册设备"""
+        msg = f"注册设备：{self.device_type}".encode('utf-8')
+        return _send_and_wait(self._prefix, msg)
+    
     def _query(self, cmd: int) -> Dict:
         """发送IMU查询命令"""
         payload = bytes([cmd, 0])
@@ -425,10 +475,30 @@ class IMUDevice:
         return f"<IMU {status}>"
 
 # ============ 全局函数 ============
+def set_send_frequency(freq_hz: float):
+    """设置发送频率限制
+    
+    Args:
+        freq_hz: 最大发送频率（Hz），设置为 0 表示不限制
+    """
+    global _send_freq_limit
+    _send_freq_limit = freq_hz
+    print(f"✓ 发送频率限制设置为: {freq_hz} Hz")
+
+def reset_frequency_stats():
+    """重置频率统计"""
+    global _send_count, _send_start_time, _last_send_time
+    _send_count = 0
+    _send_start_time = 0.0
+    _last_send_time = 0.0
+    print("✓ 频率统计已重置")
+
 def register(device_type: str):
     """注册设备"""
     if device_type == "Taks-T1-imu":
-        return IMUDevice()
+        device = IMUDevice()
+        device._register()
+        return device
     device = TaksDevice(device_type)
     device._register()
     return device
