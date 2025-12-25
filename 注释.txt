@@ -42,6 +42,10 @@ bash to_onnx.sh taks_t1 legged_gym/logs/taks_t1_stu_future/1224_taks_t1/model_10
 bash sim2sim.sh g1 legged_gym/logs/g1_stu_future/1224_taks_t1/model_13128.onnx
 bash sim2sim.sh taks_t1 legged_gym/logs/taks_t1_stu_future/1224_taks_t1/model_100.onnx
 
+【SIM2REAL】
+bash sim2real.sh g1 legged_gym/logs/g1_stu_future/1224_taks_t1/model_13128.onnx
+bash sim2real.sh taks_t1 legged_gym/logs/taks_t1_stu_future/1224_taks_t1/model_100.onnx
+
 【单机多 GPU 训练】
 说明：脚本会将 total_envs 平均分到每张 GPU（不整除会自动向下取整到可均分的总数）。
 

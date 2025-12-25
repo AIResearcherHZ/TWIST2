@@ -18,6 +18,9 @@ import redis
 from collections import deque
 from tqdm import tqdm
 import os
+from rich.console import Console
+from rich.table import Table
+from rich.live import Live
 
 import taks
 from data_utils.rot_utils import quatToEuler
@@ -118,6 +121,18 @@ POLICY_TO_SDK_JOINT_MAP = {
 
 # SDK关节ID到policy索引的反向映射
 SDK_TO_POLICY_JOINT_MAP = {v: k for k, v in POLICY_TO_SDK_JOINT_MAP.items()}
+
+# 关节名称映射
+JOINT_NAMES = {
+    0: "L_hip_pitch", 1: "L_hip_roll", 2: "L_hip_yaw", 3: "L_knee", 4: "L_ankle_pitch", 5: "L_ankle_roll",
+    6: "R_hip_pitch", 7: "R_hip_roll", 8: "R_hip_yaw", 9: "R_knee", 10: "R_ankle_pitch", 11: "R_ankle_roll",
+    12: "waist_yaw", 13: "waist_roll", 14: "waist_pitch",
+    15: "L_shoulder_pitch", 16: "L_shoulder_roll", 17: "L_shoulder_yaw", 18: "L_elbow",
+    19: "L_wrist_roll", 20: "L_wrist_yaw", 21: "L_wrist_pitch",
+    22: "R_shoulder_pitch", 23: "R_shoulder_roll", 24: "R_shoulder_yaw", 25: "R_elbow",
+    26: "R_wrist_roll", 27: "R_wrist_yaw", 28: "R_wrist_pitch",
+    29: "neck_yaw", 30: "neck_roll", 31: "neck_pitch",
+}
 
 
 class OnnxPolicyWrapper:
@@ -221,6 +236,15 @@ class TaksT1RealController:
         self.current_kp_scale = 0.0
         self.current_kd_scale = 0.0
         
+        # 频率统计
+        self.get_state_times = deque(maxlen=100)
+        self.control_mit_times = deque(maxlen=100)
+        self.loop_times = deque(maxlen=100)  # 整体循环时间
+        self.console = Console()
+        self.print_counter = 0
+        self.print_interval = 50  # 每50次打印一次表格
+        self.target_dt = CONTROL_DT  # 目标控制周期
+        
         # Default mimic obs
         self.default_mimic_obs = np.concatenate([
             np.array([0, 0]),      # xy velocity
@@ -256,6 +280,7 @@ class TaksT1RealController:
         
     def get_robot_state(self):
         """获取机器人状态"""
+        t_get_start = time.time()
         # 获取关节状态
         joint_states = self.robot.GetState()
         
@@ -286,6 +311,9 @@ class TaksT1RealController:
         else:
             ang_vel = np.zeros(3, dtype=np.float32)
         
+        # 记录get频率
+        self.get_state_times.append(time.time() - t_get_start)
+        
         return dof_pos, dof_vel, quat, ang_vel
     
     def send_mit_command(self, target_pos, kp_scale, kd_scale):
@@ -302,8 +330,17 @@ class TaksT1RealController:
                 'tau': 0.0
             }
         
+        
         # 发送命令
+        t_mit_start = time.time()
         self.robot.controlMIT(joints=mit_data)
+        self.control_mit_times.append(time.time() - t_mit_start)
+        
+        # 每隔一定次数打印MIT数据表格
+        self.print_counter += 1
+        if self.print_counter >= self.print_interval:
+            self.print_counter = 0
+            self._print_mit_table(mit_data)
     
     def ramp_up(self):
         """缓启动：线性5s升kp,kd"""
@@ -362,6 +399,39 @@ class TaksT1RealController:
         self.send_mit_command(hold_pos, 0.0, 0.0)
         print(f"\n✓ 缓关闭完成")
     
+    def _print_mit_table(self, mit_data):
+        """用rich表格打印MIT数据"""
+        # 计算频率（基于耗时）
+        get_freq = 1.0 / np.mean(self.get_state_times) if len(self.get_state_times) > 0 else 0
+        mit_freq = 1.0 / np.mean(self.control_mit_times) if len(self.control_mit_times) > 0 else 0
+        loop_freq = 1.0 / np.mean(self.loop_times) if len(self.loop_times) > 0 else 0
+        target_freq = 1.0 / self.target_dt
+        
+        table = Table(title=f"MIT Control Data | Loop: {loop_freq:.1f}/{target_freq:.0f}Hz | Get: {get_freq:.1f}Hz | Send: {mit_freq:.1f}Hz")
+        table.add_column("Policy ID", style="cyan", justify="center")
+        table.add_column("SDK ID", style="magenta", justify="center")
+        table.add_column("Name", style="green")
+        table.add_column("Position", style="yellow", justify="right")
+        table.add_column("KP", style="blue", justify="right")
+        table.add_column("KD", style="blue", justify="right")
+        table.add_column("Tau", style="red", justify="right")
+        
+        for policy_idx in range(self.num_actions):
+            sdk_jid = POLICY_TO_SDK_JOINT_MAP[policy_idx]
+            data = mit_data[sdk_jid]
+            table.add_row(
+                str(policy_idx),
+                str(sdk_jid),
+                JOINT_NAMES.get(policy_idx, "unknown"),
+                f"{data['q']:.4f}",
+                f"{data['kp']:.2f}",
+                f"{data['kd']:.2f}",
+                f"{data['tau']:.2f}"
+            )
+        
+        self.console.clear()
+        self.console.print(table)
+    
     def signal_handler(self, signum, frame):
         """处理Ctrl+C信号"""
         print("\n\n收到退出信号 (Ctrl+C)...")
@@ -385,9 +455,17 @@ class TaksT1RealController:
             print("按 Ctrl+C 安全退出")
             
             step_count = 0
+            next_loop_time = time.time()  # 下一次循环的目标时间
             
             while self.running and not self.shutdown_requested:
-                t_start = time.time()
+                loop_start = time.time()
+                
+                # 等待到目标时间点
+                sleep_time = next_loop_time - loop_start
+                if sleep_time > 0:
+                    time.sleep(sleep_time)
+                
+                actual_start = time.time()
                 
                 # 获取机器人状态
                 dof_pos, dof_vel, quat, ang_vel = self.get_robot_state()
@@ -466,15 +544,19 @@ class TaksT1RealController:
                 # 发送控制命令
                 self.send_mit_command(target_dof_pos, self.current_kp_scale, self.current_kd_scale)
                 
-                # 控制频率
-                elapsed = time.time() - t_start
-                if elapsed < CONTROL_DT:
-                    time.sleep(CONTROL_DT - elapsed)
+                # 计算下一次循环的目标时间
+                next_loop_time += self.target_dt
+                
+                # 记录实际循环时间
+                actual_loop_time = time.time() - actual_start
+                self.loop_times.append(actual_loop_time)
                 
                 step_count += 1
-                if step_count % 100 == 0:
-                    actual_dt = time.time() - t_start
-                    print(f"\rStep {step_count}, FPS: {1.0/actual_dt:.1f} Hz", end="")
+                
+                # 检测是否超时
+                if actual_loop_time > self.target_dt:
+                    # 如果超时，重新同步时间
+                    next_loop_time = time.time() + self.target_dt
                     
         except Exception as e:
             print(f"\n错误: {e}")
