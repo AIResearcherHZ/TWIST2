@@ -317,10 +317,10 @@ class TaksT1RealController:
         # 解析四元数 (w, x, y, z)
         if quat_data and isinstance(quat_data, dict) and 'w' in quat_data:
             quat = np.array([quat_data['w'], quat_data['x'], quat_data['y'], quat_data['z']], dtype=np.float32)
-            print(f"[DEBUG get_robot_state] quat: {quat}")
+            # print(f"[DEBUG get_robot_state] quat: {quat}")
         else:
             quat = np.array([1, 0, 0, 0], dtype=np.float32)
-            print(f"[DEBUG get_robot_state] quat_data: {quat_data}")
+            # print(f"[DEBUG get_robot_state] quat_data: {quat_data}")
         
         # 解析角速度
         if ang_vel_data:
