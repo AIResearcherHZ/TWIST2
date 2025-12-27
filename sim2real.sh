@@ -17,7 +17,7 @@ ROBOT_TYPE=${1:-g1}
 if [ "$ROBOT_TYPE" = "g1" ]; then
     ckpt_path=${SCRIPT_DIR}/assets/ckpts/twist2_1017_20k.onnx
 elif [ "$ROBOT_TYPE" = "taks_t1" ]; then
-    ckpt_path=${SCRIPT_DIR}/legged_gym/logs/taks_t1_stu_future/1224_taks_t1/model_100.onnx
+    ckpt_path=${SCRIPT_DIR}/legged_gym/logs/taks_t1_stu_future/1227_taks_t1/model_100.onnx
 else
     echo "错误: 未知的机器人类型 '$ROBOT_TYPE'"
     echo "用法: $0 [g1|taks_t1]"

@@ -393,7 +393,7 @@
                 <body name="neck_pitch_link" pos="0.0719 0.02095 0.0">
                   <inertial pos="0.009314 -0.020599 0.085269" mass="0.6"
                     diaginertia="0.001944 0.001944 0.001944" />
-                  <joint name="neck_pitch_joint" pos="0 0 0" axis="0 1 0" range="-0.873 0.873"
+                  <joint name="neck_pitch_joint" pos="0 0 0" axis="0 1 0" range="0.0 0.50"
                     actuatorfrcrange="-3 3" class="neck_motor" />
                   <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1.0 1.0 1.0 1"
                     mesh="neck_pitch_link" />

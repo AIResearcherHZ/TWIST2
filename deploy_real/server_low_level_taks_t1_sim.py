@@ -349,6 +349,8 @@ class RealTimePolicyController:
                         self.last_action
                     ])
 
+                    print("roll/pitch (rpy):", rpy[:2], "obs_proprio roll/pitch:", obs_proprio[3:5])
+
                     state_body = np.concatenate([
                         ang_vel,
                         rpy[:2],

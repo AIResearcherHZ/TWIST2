@@ -136,6 +136,38 @@ JOINT_NAMES = {
     29: "neck_yaw", 30: "neck_roll", 31: "neck_pitch",
 }
 
+# 关节物理限位 (从 Taks_T1_sim2sim.xml 提取，单位：弧度)
+# 顺序与 policy 输出一致
+JOINT_LIMITS_LOWER = np.array([
+    # 左腿 (6)
+    -2.5307, -0.5236, -2.7576, -0.087267, -0.87267, -0.2618,
+    # 右腿 (6)
+    -2.5307, -2.9671, -2.7576, -0.087267, -0.87267, -0.2618,
+    # 腰部 (3)
+    -2.618, -0.52, -0.52,
+    # 左臂 (7)
+    -2.0, -0.2, -2.58, -0.7, -2.67, -0.9, -0.9,
+    # 右臂 (7)
+    -2.0, -2.2515, -2.58, -0.7, -2.67, -0.9, -0.9,
+    # 脖子 (3)
+    -1.57, -0.87, 0.0,
+], dtype=np.float32)
+
+JOINT_LIMITS_UPPER = np.array([
+    # 左腿 (6)
+    2.8798, 2.9671, 2.7576, 2.8798, 0.5236, 0.2618,
+    # 右腿 (6)
+    2.8798, 0.5236, 2.7576, 2.8798, 0.5236, 0.2618,
+    # 腰部 (3)
+    2.618, 0.52, 0.52,
+    # 左臂 (7)
+    2.0, 2.2515, 2.58, 1.57, 2.67, 0.9, 0.9,
+    # 右臂 (7)
+    2.0, 0.2, 2.58, 1.57, 2.67, 0.9, 0.9,
+    # 脖子 (3)
+    1.57, 0.87, 0.50,
+], dtype=np.float32)
+
 
 class OnnxPolicyWrapper:
     """Minimal wrapper so ONNXRuntime policies mimic TorchScript call signature."""
@@ -254,6 +286,7 @@ class TaksT1RealController:
         self.get_state_timestamps = deque(maxlen=100)
         self.control_mit_timestamps = deque(maxlen=100)
         self.loop_timestamps = deque(maxlen=100)
+        self.loop_times = []  # 记录每次循环的实际耗时
         self.console = Console()
         self.print_counter = 0
         self.print_interval = int(self.control_freq)  # 每秒打印一次表格
@@ -267,6 +300,11 @@ class TaksT1RealController:
             np.array([0]),         # yaw angular velocity
             self.default_dof_pos   # 32 DOF
         ]).astype(np.float32)
+        
+        # IMU 数据缓存 (用于处理通信丢包)
+        self.last_valid_quat = np.array([1, 0, 0, 0], dtype=np.float32)
+        self.last_valid_ang_vel = np.zeros(3, dtype=np.float32)
+        self.imu_fail_count = 0
         
     def connect_robot(self):
         """连接机器人"""
@@ -314,19 +352,27 @@ class TaksT1RealController:
                     dof_pos[policy_idx] = state.get('pos', 0.0)
                     dof_vel[policy_idx] = state.get('vel', 0.0)
         
-        # 解析四元数 (w, x, y, z)
+        # 解析四元数 (w, x, y, z) - 使用缓存机制处理通信丢包
+        quat_valid = False
         if quat_data and isinstance(quat_data, dict) and 'w' in quat_data:
             quat = np.array([quat_data['w'], quat_data['x'], quat_data['y'], quat_data['z']], dtype=np.float32)
-            # print(f"[DEBUG get_robot_state] quat: {quat}")
-        else:
-            quat = np.array([1, 0, 0, 0], dtype=np.float32)
-            # print(f"[DEBUG get_robot_state] quat_data: {quat_data}")
+            # 检查是否为有效数据 (非全零)
+            if np.abs(quat).sum() > 0.1:  # 有效四元数模长约为1
+                self.last_valid_quat = quat.copy()
+                quat_valid = True
         
-        # 解析角速度
-        if ang_vel_data:
+        if not quat_valid:
+            quat = self.last_valid_quat.copy()
+            self.imu_fail_count += 1
+        
+        # 解析角速度 - 使用缓存机制
+        ang_vel_valid = False
+        if ang_vel_data and isinstance(ang_vel_data, dict) and 'x' in ang_vel_data:
             ang_vel = np.array([ang_vel_data['x'], ang_vel_data['y'], ang_vel_data['z']], dtype=np.float32)
+            self.last_valid_ang_vel = ang_vel.copy()
+            ang_vel_valid = True
         else:
-            ang_vel = np.zeros(3, dtype=np.float32)
+            ang_vel = self.last_valid_ang_vel.copy()
         
         # 记录get时间点
         self.get_state_timestamps.append(time.time())
@@ -534,106 +580,111 @@ class TaksT1RealController:
             next_loop_time = time.time()  # 下一次循环的目标时间
             
             # ========== 注释掉policy执行循环，只测试缓慢启动 ==========
-            # while self.running and not self.shutdown_requested:
-            #     loop_start = time.time()
-            #     
-            #     # 等待到目标时间点
-            #     sleep_time = next_loop_time - loop_start
-            #     if sleep_time > 0:
-            #         time.sleep(sleep_time)
-            #     
-            #     actual_start = time.time()
-            #     
-            #     # 获取机器人状态
-            #     dof_pos, dof_vel, quat, ang_vel = self.get_robot_state()
-            #     
-            #     # 计算RPY
-            #     rpy = quatToEuler(quat)
-            #     
-            #     # 构建本体感知观测
-            #     obs_body_dof_vel = dof_vel.copy()
-            #     obs_body_dof_vel[self.ankle_idx] = 0.0
-            #     
-            #     obs_proprio = np.concatenate([
-            #         ang_vel * self.ang_vel_scale,
-            #         rpy[:2],  # roll, pitch
-            #         (dof_pos - self.default_dof_pos) * self.dof_pos_scale,
-            #         obs_body_dof_vel * self.dof_vel_scale,
-            #         self.last_action
-            #     ])
-            #     
-            #     # 发送状态到Redis (用于motion server)
-            #     if self.redis_client:
-            #         state_body = np.concatenate([ang_vel, rpy[:2], dof_pos])
-            #         self.redis_pipeline.set("state_body_taks_t1", json.dumps(state_body.tolist()))
-            #         self.redis_pipeline.set("state_hand_left_taks_t1", json.dumps(np.zeros(7).tolist()))
-            #         self.redis_pipeline.set("state_hand_right_taks_t1", json.dumps(np.zeros(7).tolist()))
-            #         self.redis_pipeline.set("state_neck_taks_t1", json.dumps(np.zeros(2).tolist()))
-            #         self.redis_pipeline.set("t_state", int(time.time() * 1000))
-            #         self.redis_pipeline.execute()
-            #     
-            #     # 从Redis获取mimic观测
-            #     action_mimic = self.default_mimic_obs.copy()
-            #     action_neck = np.zeros(2, dtype=np.float32)
-            #     
-            #     if self.redis_client:
-            #         keys = ["action_body_taks_t1", "action_neck_taks_t1"]
-            #         for key in keys:
-            #             self.redis_pipeline.get(key)
-            #         redis_results = self.redis_pipeline.execute()
-            #         
-            #         if redis_results[0] is not None:
-            #             action_mimic = np.array(json.loads(redis_results[0]), dtype=np.float32)
-            #         if redis_results[1] is not None:
-            #             action_neck = np.array(json.loads(redis_results[1]), dtype=np.float32)
-            #         
-            #         # Handle G1 format (35 dims) -> Taks_T1 format (38 dims)
-            #         if len(action_mimic) == 35:
-            #             neck_joints = np.array([action_neck[0], 0.0, action_neck[1]], dtype=np.float32)
-            #             action_mimic = np.concatenate([action_mimic, neck_joints])
-            #     
-            #     # 构建完整观测
-            #     obs_full = np.concatenate([action_mimic, obs_proprio])
-            #     
-            #     # 更新历史
-            #     obs_hist = np.array(self.proprio_history_buf).flatten()
-            #     self.proprio_history_buf.append(obs_full)
-            #     
-            #     future_obs = action_mimic.copy()
-            #     
-            #     # 组合所有观测
-            #     obs_buf = np.concatenate([obs_full, obs_hist, future_obs])
-            #     
-            #     assert obs_buf.shape[0] == self.total_obs_size, \
-            #         f"Expected {self.total_obs_size} obs, got {obs_buf.shape[0]}"
-            #     
-            #     # 运行policy
-            #     obs_tensor = torch.from_numpy(obs_buf).float().unsqueeze(0).to(self.device)
-            #     with torch.no_grad():
-            #         raw_action = self.policy(obs_tensor).cpu().numpy().squeeze()
-            #     
-            #     self.last_action = raw_action.copy()
-            #     
-            #     # 计算目标位置
-            #     raw_action = np.clip(raw_action, -10.0, 10.0)
-            #     target_dof_pos = self.default_dof_pos + raw_action * self.action_scale
-            #     
-            #     # 发送控制命令
-            #     self.send_mit_command(target_dof_pos, self.current_kp_scale, self.current_kd_scale)
-            #     
-            #     # 计算下一次循环的目标时间
-            #     next_loop_time += self.target_dt
-            #     
-            #     # 记录实际循环时间
-            #     actual_loop_time = time.time() - actual_start
-            #     self.loop_times.append(actual_loop_time)
-            #     
-            #     step_count += 1
-            #     
-            #     # 检测是否超时
-            #     if actual_loop_time > self.target_dt:
-            #         # 如果超时，重新同步时间
-            #         next_loop_time = time.time() + self.target_dt
+            while self.running and not self.shutdown_requested:
+                loop_start = time.time()
+                
+                # 等待到目标时间点
+                sleep_time = next_loop_time - loop_start
+                if sleep_time > 0:
+                    time.sleep(sleep_time)
+                
+                actual_start = time.time()
+                
+                # 获取机器人状态
+                dof_pos, dof_vel, quat, ang_vel = self.get_robot_state()
+                
+                # 计算RPY
+                rpy = quatToEuler(quat)
+                
+                # 构建本体感知观测
+                obs_body_dof_vel = dof_vel.copy()
+                obs_body_dof_vel[self.ankle_idx] = 0.0
+                
+                obs_proprio = np.concatenate([
+                    ang_vel * self.ang_vel_scale,
+                    rpy[:2],  # roll, pitch
+                    (dof_pos - self.default_dof_pos) * self.dof_pos_scale,
+                    obs_body_dof_vel * self.dof_vel_scale,
+                    self.last_action
+                ])
+                
+                print("roll/pitch (rpy):", rpy[:2], "obs_proprio roll/pitch:", obs_proprio[3:5])
+
+                # 发送状态到Redis (用于motion server)
+                if self.redis_client:
+                    state_body = np.concatenate([ang_vel, rpy[:2], dof_pos])
+                    self.redis_pipeline.set("state_body_taks_t1", json.dumps(state_body.tolist()))
+                    self.redis_pipeline.set("state_hand_left_taks_t1", json.dumps(np.zeros(7).tolist()))
+                    self.redis_pipeline.set("state_hand_right_taks_t1", json.dumps(np.zeros(7).tolist()))
+                    self.redis_pipeline.set("state_neck_taks_t1", json.dumps(np.zeros(2).tolist()))
+                    self.redis_pipeline.set("t_state", int(time.time() * 1000))
+                    self.redis_pipeline.execute()
+                
+                # 从Redis获取mimic观测
+                action_mimic = self.default_mimic_obs.copy()
+                action_neck = np.zeros(2, dtype=np.float32)
+                
+                if self.redis_client:
+                    keys = ["action_body_taks_t1", "action_neck_taks_t1"]
+                    for key in keys:
+                        self.redis_pipeline.get(key)
+                    redis_results = self.redis_pipeline.execute()
+                    
+                    if redis_results[0] is not None:
+                        action_mimic = np.array(json.loads(redis_results[0]), dtype=np.float32)
+                    if redis_results[1] is not None:
+                        action_neck = np.array(json.loads(redis_results[1]), dtype=np.float32)
+                    
+                    # Handle G1 format (35 dims) -> Taks_T1 format (38 dims)
+                    if len(action_mimic) == 35:
+                        neck_joints = np.array([action_neck[0], 0.0, action_neck[1]], dtype=np.float32)
+                        action_mimic = np.concatenate([action_mimic, neck_joints])
+                
+                # 构建完整观测
+                obs_full = np.concatenate([action_mimic, obs_proprio])
+                
+                # 更新历史
+                obs_hist = np.array(self.proprio_history_buf).flatten()
+                self.proprio_history_buf.append(obs_full)
+                
+                future_obs = action_mimic.copy()
+                
+                # 组合所有观测
+                obs_buf = np.concatenate([obs_full, obs_hist, future_obs])
+                
+                assert obs_buf.shape[0] == self.total_obs_size, \
+                    f"Expected {self.total_obs_size} obs, got {obs_buf.shape[0]}"
+                
+                # 运行policy
+                obs_tensor = torch.from_numpy(obs_buf).float().unsqueeze(0).to(self.device)
+                with torch.no_grad():
+                    raw_action = self.policy(obs_tensor).cpu().numpy().squeeze()
+                
+                self.last_action = raw_action.copy()
+                
+                # 计算目标位置
+                raw_action = np.clip(raw_action, -5.0, 5.0)
+                target_dof_pos = self.default_dof_pos + raw_action * self.action_scale
+                
+                # 应用关节物理限位
+                target_dof_pos = np.clip(target_dof_pos, JOINT_LIMITS_LOWER, JOINT_LIMITS_UPPER)
+                
+                # 发送控制命令
+                self.send_mit_command(target_dof_pos, self.current_kp_scale, self.current_kd_scale)
+                
+                # 计算下一次循环的目标时间
+                next_loop_time += self.target_dt
+                
+                # 记录实际循环时间
+                actual_loop_time = time.time() - actual_start
+                self.loop_times.append(actual_loop_time)
+                
+                step_count += 1
+                
+                # 检测是否超时
+                if actual_loop_time > self.target_dt:
+                    # 如果超时，重新同步时间
+                    next_loop_time = time.time() + self.target_dt
             
             print("\n缓启动测试完成，等待Ctrl+C退出...")
             while not self.shutdown_requested:
@@ -645,9 +696,9 @@ class TaksT1RealController:
             traceback.print_exc()
         finally:
             # ========== 注释掉缓关闭，只测试缓慢启动 ==========
-            # # 缓关闭
-            # self.running = False
-            # self.ramp_down()
+            # 缓关闭
+            self.running = False
+            self.ramp_down()
             
             # 断开连接
             self.disconnect_robot()
