@@ -320,8 +320,8 @@ class TaksT1RealController:
         self.imu = taks.register("Taks-T1-imu")
         print("✓ Taks-T1-imu 注册成功")
         
-        print("等待10秒后开始控制...")
-        for i in range(10, 0, -1):
+        print("等待5秒后开始控制...")
+        for i in range(5, 0, -1):
             print(f"  {i}...")
             time.sleep(1)
         print("开始控制!")
@@ -332,14 +332,9 @@ class TaksT1RealController:
         print("✓ 已断开连接")
         
     def get_robot_state(self):
-        """获取机器人状态"""
-        t_get_start = time.time()
-        # 获取关节状态
-        joint_states = self.robot.GetState()
-        
-        # 获取IMU数据
-        quat_data = self.imu.get_quat()
-        ang_vel_data = self.imu.get_ang_vel()
+        """获取机器人状态 - 使用batch_query优化"""
+        # ========== 并行查询电机和IMU ==========
+        joint_states, imu_data = taks.batch_query(self.robot, self.imu)
         
         # 解析关节位置和速度 (按policy顺序排列)
         dof_pos = np.zeros(self.num_actions, dtype=np.float32)
@@ -352,26 +347,33 @@ class TaksT1RealController:
                     dof_pos[policy_idx] = state.get('pos', 0.0)
                     dof_vel[policy_idx] = state.get('vel', 0.0)
         
-        # 解析四元数 (w, x, y, z) - 使用缓存机制处理通信丢包
+        # 解析IMU数据 - 使用缓存机制处理通信丢包
         quat_valid = False
-        if quat_data and isinstance(quat_data, dict) and 'w' in quat_data:
-            quat = np.array([quat_data['w'], quat_data['x'], quat_data['y'], quat_data['z']], dtype=np.float32)
-            # 检查是否为有效数据 (非全零)
-            if np.abs(quat).sum() > 0.1:  # 有效四元数模长约为1
-                self.last_valid_quat = quat.copy()
-                quat_valid = True
+        ang_vel_valid = False
         
+        if imu_data is not None:
+            # 解析四元数 (w, x, y, z)
+            quat_data = imu_data.get('quat')
+            if quat_data and isinstance(quat_data, dict) and 'w' in quat_data:
+                quat = np.array([quat_data['w'], quat_data['x'], quat_data['y'], quat_data['z']], dtype=np.float32)
+                # 检查是否为有效数据 (非全零)
+                if np.abs(quat).sum() > 0.1:  # 有效四元数模长约为1
+                    self.last_valid_quat = quat.copy()
+                    quat_valid = True
+            
+            # 解析角速度
+            ang_vel_data = imu_data.get('ang_vel')
+            if ang_vel_data and isinstance(ang_vel_data, dict) and 'x' in ang_vel_data:
+                ang_vel = np.array([ang_vel_data['x'], ang_vel_data['y'], ang_vel_data['z']], dtype=np.float32)
+                self.last_valid_ang_vel = ang_vel.copy()
+                ang_vel_valid = True
+        
+        # 使用缓存数据
         if not quat_valid:
             quat = self.last_valid_quat.copy()
             self.imu_fail_count += 1
         
-        # 解析角速度 - 使用缓存机制
-        ang_vel_valid = False
-        if ang_vel_data and isinstance(ang_vel_data, dict) and 'x' in ang_vel_data:
-            ang_vel = np.array([ang_vel_data['x'], ang_vel_data['y'], ang_vel_data['z']], dtype=np.float32)
-            self.last_valid_ang_vel = ang_vel.copy()
-            ang_vel_valid = True
-        else:
+        if not ang_vel_valid:
             ang_vel = self.last_valid_ang_vel.copy()
         
         # 记录get时间点
@@ -608,10 +610,10 @@ class TaksT1RealController:
                     self.last_action
                 ])
                 
-                # print("roll/pitch (rpy):", rpy[:2], "obs_proprio roll/pitch:", obs_proprio[3:5])
+                print("roll/pitch (rpy):", rpy[:2], "obs_proprio roll/pitch:", obs_proprio[3:5])
                 # 打印关节编号与位置，便于对应 policy idx -> SDK jid
-                dof_with_idx = [f"{i}:{dof_pos[i]:.4f}" for i in range(self.num_actions)]
-                print("dof_pos (policy_idx:value):", ", ".join(dof_with_idx))
+                # dof_with_idx = [f"{i}:{dof_pos[i]:.4f}" for i in range(self.num_actions)]
+                # print("dof_pos (policy_idx:value):", ", ".join(dof_with_idx))
 
                 # 发送状态到Redis (用于motion server)
                 if self.redis_client:

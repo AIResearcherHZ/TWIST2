@@ -44,12 +44,14 @@ def connect(address: str, cmd_port: int = 5555, sub_port: int = 5556):
     _address = address
     
     _dealer = _ctx.socket(zmq.DEALER)
-    _dealer.setsockopt(zmq.RCVTIMEO, 5000)
-    _dealer.setsockopt(zmq.SNDTIMEO, 1000)
+    _dealer.setsockopt(zmq.RCVTIMEO, 200)
+    _dealer.setsockopt(zmq.SNDTIMEO, 50)
+    _dealer.setsockopt(zmq.LINGER, 0)
     _dealer.connect(f"tcp://{address}:{cmd_port}")
     
     _sub = _ctx.socket(zmq.SUB)
-    _sub.setsockopt(zmq.RCVTIMEO, 100)
+    _sub.setsockopt(zmq.RCVTIMEO, 10)
+    _sub.setsockopt(zmq.LINGER, 0)
     _sub.connect(f"tcp://{address}:{sub_port}")
     _sub.setsockopt(zmq.SUBSCRIBE, b'')
     
@@ -116,14 +118,41 @@ def _send_and_wait(msg: dict, timeout: float = 1.0) -> dict:
         except Exception as e:
             return {'ok': False, 'error': str(e)}
 
+def _send_batch(msgs: list) -> list:
+    """批量发送命令并等待所有响应（并行）"""
+    if not _dealer:
+        raise RuntimeError("未连接，请先调用 connect()")
+    
+    results = []
+    with _lock:
+        # 批量发送所有消息
+        for msg in msgs:
+            data = json.dumps(msg).encode('utf-8')
+            _dealer.send_multipart([b'', data])
+        
+        # 批量接收所有响应
+        for _ in msgs:
+            try:
+                frames = _dealer.recv_multipart()
+                if frames:
+                    results.append(json.loads(frames[-1].decode('utf-8')))
+                else:
+                    results.append({'ok': False, 'error': 'empty response'})
+            except zmq.Again:
+                results.append({'ok': False, 'error': 'timeout'})
+            except Exception as e:
+                results.append({'ok': False, 'error': str(e)})
+    
+    return results
+
 def _send_nowait(msg: dict):
     """发送命令，不等待响应"""
     if not _dealer:
         raise RuntimeError("未连接，请先调用 connect()")
     
     data = json.dumps(msg).encode('utf-8')
-    _dealer.send_multipart([b'', data], zmq.NOBLOCK)
-    time.sleep(0.005)
+    with _lock:
+        _dealer.send_multipart([b'', data], zmq.NOBLOCK)
 
 # ============ 关节控制类 ============
 class JointControl:
@@ -366,6 +395,31 @@ class IMUDevice:
         """获取欧拉角 -> {'roll', 'pitch', 'yaw'}"""
         return self._get_with_cache('rpy', 'rpy')
     
+    def get_all_data(self) -> Optional[Dict]:
+        """一次性获取所有IMU数据 -> {'ang_vel', 'lin_acc', 'quat', 'rpy'}"""
+        result = _send_and_wait({'device': self.device_type, 'cmd': 'get_all'})
+        if result.get('ok') and 'data' in result:
+            data = result['data']
+            # 更新缓存
+            with _imu_cache_lock:
+                if 'ang_vel' in data:
+                    _imu_cache['ang_vel'] = data['ang_vel']
+                if 'lin_acc' in data:
+                    _imu_cache['lin_acc'] = data['lin_acc']
+                if 'quat' in data:
+                    _imu_cache['quat'] = data['quat']
+                if 'rpy' in data:
+                    _imu_cache['rpy'] = data['rpy']
+            return data
+        # 返回缓存
+        with _imu_cache_lock:
+            return {
+                'ang_vel': _imu_cache.get('ang_vel'),
+                'lin_acc': _imu_cache.get('lin_acc'),
+                'quat': _imu_cache.get('quat'),
+                'rpy': _imu_cache.get('rpy')
+            }
+    
     def calibrate_zero(self) -> bool:
         """角度值标定零位"""
         result = _send_and_wait({'device': self.device_type, 'cmd': 'cal_zero'})
@@ -393,3 +447,50 @@ def register(device_type: str):
     device = TaksDevice(device_type)
     device._register()
     return device
+
+def batch_query(robot: 'TaksDevice', imu: 'IMUDevice') -> tuple:
+    """并行查询电机状态和IMU数据
+    
+    Returns:
+        (motor_state, imu_data) - 电机状态字典和IMU数据字典
+    """
+    msgs = [
+        {'device': robot.device_type, 'cmd': 'query', 'jids': []},
+        {'device': imu.device_type, 'cmd': 'get_all'}
+    ]
+    results = _send_batch(msgs)
+    
+    # 解析电机状态
+    motor_state = None
+    if results[0].get('ok') and 'joints' in results[0]:
+        motor_state = {int(k): v for k, v in results[0]['joints'].items()}
+        with _motor_cache_lock:
+            _motor_state_cache[robot.device_type] = motor_state
+    else:
+        with _motor_cache_lock:
+            if robot.device_type in _motor_state_cache:
+                motor_state = _motor_state_cache[robot.device_type].copy()
+    
+    # 解析IMU数据
+    imu_data = None
+    if results[1].get('ok') and 'data' in results[1]:
+        imu_data = results[1]['data']
+        with _imu_cache_lock:
+            if 'ang_vel' in imu_data:
+                _imu_cache['ang_vel'] = imu_data['ang_vel']
+            if 'lin_acc' in imu_data:
+                _imu_cache['lin_acc'] = imu_data['lin_acc']
+            if 'quat' in imu_data:
+                _imu_cache['quat'] = imu_data['quat']
+            if 'rpy' in imu_data:
+                _imu_cache['rpy'] = imu_data['rpy']
+    else:
+        with _imu_cache_lock:
+            imu_data = {
+                'ang_vel': _imu_cache.get('ang_vel'),
+                'lin_acc': _imu_cache.get('lin_acc'),
+                'quat': _imu_cache.get('quat'),
+                'rpy': _imu_cache.get('rpy')
+            }
+    
+    return motor_state, imu_data
