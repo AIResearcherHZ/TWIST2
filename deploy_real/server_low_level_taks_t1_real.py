@@ -36,7 +36,7 @@ CONTROL_FREQ = 50.0  # Hz
 CONTROL_DT = 1.0 / CONTROL_FREQ  # 秒
 
 # 缓启动/缓关闭时间 (秒)
-RAMP_UP_TIME = 5.0
+RAMP_UP_TIME = 10.0
 RAMP_DOWN_TIME = 5.0
 
 # ============ 全局 KP/KD 配置 ============
@@ -55,9 +55,9 @@ GLOBAL_KP = np.array([
     # 腰部 (3)
     150, 150, 150,
     # 左臂 (7)
-    40, 40, 40, 40, 20, 20, 20,
+    20, 20, 20, 20, 10, 10, 10,
     # 右臂 (7)
-    40, 40, 40, 40, 20, 20, 20,
+    20, 20, 20, 20, 10, 10, 10,
     # 脖子 (3)
     1, 1, 1,
 ], dtype=np.float32)
@@ -671,24 +671,24 @@ class TaksT1RealController:
                 with torch.no_grad():
                     raw_action = self.policy(obs_tensor).cpu().numpy().squeeze()
                 
-                # Measure and track policy execution FPS
-                current_time = time.time()
-                if self.last_policy_time is not None:
-                    policy_interval = current_time - self.last_policy_time
+                # # Measure and track policy execution FPS
+                # current_time = time.time()
+                # if self.last_policy_time is not None:
+                #     policy_interval = current_time - self.last_policy_time
                     
-                    # Track policy execution times
-                    self.policy_execution_times.append(policy_interval)
-                    self.policy_step_count += 1
+                #     # Track policy execution times
+                #     self.policy_execution_times.append(policy_interval)
+                #     self.policy_step_count += 1
                     
-                    # Print policy execution FPS every 100 steps
-                    if self.policy_step_count % self.policy_fps_print_interval == 0:
-                        recent_intervals = self.policy_execution_times[-self.policy_fps_print_interval:]
-                        avg_interval = np.mean(recent_intervals)
-                        avg_execution_fps = 1.0 / avg_interval
-                        print(f"Policy Execution FPS (last {self.policy_fps_print_interval} steps): {avg_execution_fps:.2f} Hz (avg interval: {avg_interval*1000:.2f}ms)")
-                self.last_policy_time = current_time
+                #     # Print policy execution FPS every 100 steps
+                #     if self.policy_step_count % self.policy_fps_print_interval == 0:
+                #         recent_intervals = self.policy_execution_times[-self.policy_fps_print_interval:]
+                #         avg_interval = np.mean(recent_intervals)
+                #         avg_execution_fps = 1.0 / avg_interval
+                #         print(f"Policy Execution FPS (last {self.policy_fps_print_interval} steps): {avg_execution_fps:.2f} Hz (avg interval: {avg_interval*1000:.2f}ms)")
+                # self.last_policy_time = current_time
                 
-                self.last_action = raw_action.copy()
+                # self.last_action = raw_action.copy()
                 
                 # 计算目标位置
                 raw_action = np.clip(raw_action, -5.0, 5.0)
