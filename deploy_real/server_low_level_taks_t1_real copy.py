@@ -59,7 +59,7 @@ GLOBAL_KP = np.array([
     # 右臂 (7)
     40, 40, 40, 40, 20, 20, 20,
     # 脖子 (3)
-    20, 20, 20,
+    5, 5, 5,
 ], dtype=np.float32)
 
 GLOBAL_KD = np.array([
@@ -74,7 +74,7 @@ GLOBAL_KD = np.array([
     # 右臂 (7)
     5, 5, 5, 5, 1, 1, 1,
     # 脖子 (3)
-    2, 2, 2,
+    0.5, 0.5, 0.5,
 ], dtype=np.float32)
 
 # Taks-T1 关节ID映射 (SDK中的关节编号)
