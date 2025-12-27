@@ -101,24 +101,51 @@ def _receive_loop():
             if _running:
                 pass
 
+_request_id_counter = 0
+_request_id_lock = threading.Lock()
+
+def _get_next_request_id() -> int:
+    """获取下一个请求ID"""
+    global _request_id_counter
+    with _request_id_lock:
+        _request_id_counter += 1
+        return _request_id_counter
+
 def _send_and_wait(msg: dict, timeout: float = 1.0) -> dict:
     """发送命令并等待响应"""
     if not _dealer:
         raise RuntimeError("未连接，请先调用 connect()")
     
+    # 为请求添加唯一ID
+    req_id = _get_next_request_id()
+    msg['req_id'] = req_id
+    
     with _lock:
         data = json.dumps(msg).encode('utf-8')
         _dealer.send_multipart([b'', data])
         
-        try:
-            frames = _dealer.recv_multipart()
-            if frames:
-                return json.loads(frames[-1].decode('utf-8'))
-            return {'ok': False, 'error': 'empty response'}
-        except zmq.Again:
-            return {'ok': False, 'error': 'timeout'}
-        except Exception as e:
-            return {'ok': False, 'error': str(e)}
+        # 循环接收直到找到匹配的响应或超时
+        start_time = time.time()
+        while True:
+            try:
+                frames = _dealer.recv_multipart()
+                if frames:
+                    result = json.loads(frames[-1].decode('utf-8'))
+                    # 检查响应ID是否匹配
+                    resp_id = result.get('req_id')
+                    if resp_id == req_id:
+                        return result
+                    # ID不匹配，继续接收（可能是之前请求的响应）
+                    if time.time() - start_time > timeout:
+                        return {'ok': False, 'error': 'timeout'}
+                    continue
+                return {'ok': False, 'error': 'empty response'}
+            except zmq.Again:
+                if time.time() - start_time > timeout:
+                    return {'ok': False, 'error': 'timeout'}
+                continue
+            except Exception as e:
+                return {'ok': False, 'error': str(e)}
 
 def _send_batch(msgs: list) -> list:
     """批量发送命令并等待所有响应（并行）"""
