@@ -44,8 +44,10 @@ def connect(address: str, cmd_port: int = 5555, sub_port: int = 5556):
     _address = address
     
     _dealer = _ctx.socket(zmq.DEALER)
-    _dealer.setsockopt(zmq.RCVTIMEO, 200)
-    _dealer.setsockopt(zmq.SNDTIMEO, 50)
+    _dealer.setsockopt(zmq.RCVTIMEO, 30)
+    _dealer.setsockopt(zmq.SNDTIMEO, 10)
+    _dealer.setsockopt(zmq.SNDHWM, 100)
+    _dealer.setsockopt(zmq.RCVHWM, 100)
     _dealer.setsockopt(zmq.LINGER, 0)
     _dealer.connect(f"tcp://{address}:{cmd_port}")
     
@@ -125,10 +127,10 @@ def _send_batch(msgs: list) -> list:
     
     results = []
     with _lock:
-        # 批量发送所有消息
-        for msg in msgs:
-            data = json.dumps(msg).encode('utf-8')
-            _dealer.send_multipart([b'', data])
+        # 批量发送所有消息 - 预编码减少循环内开销
+        encoded_msgs = [json.dumps(msg).encode('utf-8') for msg in msgs]
+        for data in encoded_msgs:
+            _dealer.send_multipart([b'', data], zmq.NOBLOCK)
         
         # 批量接收所有响应
         for _ in msgs:

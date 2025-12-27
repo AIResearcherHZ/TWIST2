@@ -292,6 +292,12 @@ class TaksT1RealController:
         self.print_interval = int(self.control_freq)  # 每秒打印一次表格
         self.target_dt = self.control_dt  # 目标控制周期
         
+        # Policy execution FPS tracking (similar to sim)
+        self.policy_execution_times = []
+        self.policy_step_count = 0
+        self.policy_fps_print_interval = 100
+        self.last_policy_time = None
+        
         # Default mimic obs
         self.default_mimic_obs = np.concatenate([
             np.array([0, 0]),      # xy velocity
@@ -664,6 +670,23 @@ class TaksT1RealController:
                 obs_tensor = torch.from_numpy(obs_buf).float().unsqueeze(0).to(self.device)
                 with torch.no_grad():
                     raw_action = self.policy(obs_tensor).cpu().numpy().squeeze()
+                
+                # Measure and track policy execution FPS
+                current_time = time.time()
+                if self.last_policy_time is not None:
+                    policy_interval = current_time - self.last_policy_time
+                    
+                    # Track policy execution times
+                    self.policy_execution_times.append(policy_interval)
+                    self.policy_step_count += 1
+                    
+                    # Print policy execution FPS every 100 steps
+                    if self.policy_step_count % self.policy_fps_print_interval == 0:
+                        recent_intervals = self.policy_execution_times[-self.policy_fps_print_interval:]
+                        avg_interval = np.mean(recent_intervals)
+                        avg_execution_fps = 1.0 / avg_interval
+                        print(f"Policy Execution FPS (last {self.policy_fps_print_interval} steps): {avg_execution_fps:.2f} Hz (avg interval: {avg_interval*1000:.2f}ms)")
+                self.last_policy_time = current_time
                 
                 self.last_action = raw_action.copy()
                 
