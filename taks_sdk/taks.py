@@ -1,53 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Taks SDK - ZeroMQ 客户端库（同步版）
+Taks SDK - ZeroMQ 客户端库
 特点：
 1. DEALER socket：双向通信
-2. SUB socket：订阅机器人状态广播
-3. 纯同步 API，无异步接口
+2. SUB socket：订阅状态广播
+3. JSON 协议：简单可靠
 """
 
 import zmq
-import struct
+import json
 import threading
 import time
 from typing import List, Optional, Dict, Callable
-from enum import IntEnum
 
-# ============ 配置常量 ============
-DEVICE_PREFIXES = {
-    "Taks-T1": bytes([0xC7, 0xE9, 0x67, 0x34, 0x67, 0x7F]),
-    "Taks-T1-leftarm": bytes([0xC7, 0xE9, 0x67, 0x34, 0x6A, 0x97]),
-    "Taks-T1-rightarm": bytes([0xC7, 0xE9, 0x67, 0x34, 0x6B, 0x0A]),
-    "Taks-T1-semibody": bytes([0xC7, 0xE9, 0x67, 0x34, 0x6B, 0x08]),
-    "Taks-T1-rightgripper": bytes([0xC7, 0xE9, 0x67, 0x34, 0x6C, 0xC3]),
-    "Taks-T1-leftgripper": bytes([0xC7, 0xE9, 0x67, 0x34, 0x6C, 0x50]),
-    "Taks-T1-imu": bytes([0xC7, 0xE9, 0x67, 0x34, 0x68, 0xF7]),
-}
-
-class CMD(IntEnum):
-    POS_CTRL = 0x01
-    POS_QUERY = 0x02
-    VEL_QUERY = 0x03
-    TRQ_QUERY = 0x04
-    MIT_CTRL = 0x05
-    # IMU 命令
-    IMU_ANG_VEL = 0x10
-    IMU_LIN_ACC = 0x11
-    IMU_QUAT = 0x12
-    IMU_RPY = 0x13
-    IMU_CAL_ZERO = 0x14
-    IMU_CAL_GYRO = 0x15
-    REGISTER = 0xFF
-
-class RESP(IntEnum):
-    ACK = 0x00
-    STATE = 0x01
-    IMU_DATA = 0x02
-    ERROR = 0xFF
-
-# ============ 全局连接状态 ============
+# ============ 全局状态 ============
 _ctx: Optional[zmq.Context] = None
 _dealer: Optional[zmq.Socket] = None
 _sub: Optional[zmq.Socket] = None
@@ -57,72 +24,14 @@ _recv_thread: Optional[threading.Thread] = None
 _running: bool = False
 _lock = threading.Lock()
 
-# ============ 发送频率控制 ============
-_send_freq_limit: float =10.0
-_last_send_time: float = 0.0
-_send_count: int = 0
-_send_start_time: float = 0.0
-_freq_print_interval: int = 50  # 每50次打印一次频率
+# IMU 缓存
+_imu_cache: Dict[str, Dict] = {}
+_imu_cache_lock = threading.Lock()
 
-# ============ 二进制协议编解码 ============
-def _encode_position(joints: Dict[int, float]) -> bytes:
-    buf = bytearray([CMD.POS_CTRL, len(joints)])
-    for jid, val in joints.items():
-        buf.extend(struct.pack('Bf', jid, val))
-    return bytes(buf)
+# 电机状态缓存
+_motor_state_cache: Dict[str, Dict] = {}  # device_type -> {jid: state}
+_motor_cache_lock = threading.Lock()
 
-def _encode_mit(joints: Dict[int, Dict]) -> bytes:
-    buf = bytearray([CMD.MIT_CTRL, len(joints)])
-    nan = float('nan')
-    
-    for jid, p in joints.items():
-        kp = p.get('kp') if p.get('kp') is not None else nan
-        kd = p.get('kd') if p.get('kd') is not None else nan
-        q, dq, tau = p.get('q', 0), p.get('dq', 0), p.get('tau', 0)
-        buf.extend(struct.pack('Bfffff', jid, kp, kd, q, dq, tau))
-    
-    return bytes(buf)
-
-def _encode_query(cmd_type: int, jids: List[int] = None) -> bytes:
-    count = len(jids) if jids else 0
-    buf = bytearray([cmd_type, count])
-    if jids:
-        buf.extend(jids)
-    return bytes(buf)
-
-def _decode_response(data: bytes) -> Dict:
-    """解码服务器响应"""
-    if len(data) < 1:
-        return {'ok': False, 'error': 'empty response'}
-    
-    resp_type = data[0]
-    if resp_type == RESP.ACK:
-        return {'ok': True, 'code': data[1] if len(data) > 1 else 0}
-    elif resp_type == RESP.STATE:
-        count = data[1] if len(data) > 1 else 0
-        joints = {}
-        offset = 2
-        for i in range(count):
-            if offset + 13 > len(data):
-                break
-            jid, pos, vel, tau = struct.unpack_from('Bfff', data, offset)
-            joints[jid] = {'pos': pos, 'vel': vel, 'tau': tau}
-            offset += 13
-        return {'ok': True, 'joints': joints}
-    elif resp_type == RESP.IMU_DATA:
-        imu_type = data[1] if len(data) > 1 else 0
-        if imu_type == CMD.IMU_QUAT and len(data) >= 18:
-            w, x, y, z = struct.unpack_from('ffff', data, 2)
-            return {'ok': True, 'w': w, 'x': x, 'y': y, 'z': z}
-        elif len(data) >= 14:
-            x, y, z = struct.unpack_from('fff', data, 2)
-            return {'ok': True, 'x': x, 'y': y, 'z': z}
-        return {'ok': False, 'error': 'invalid IMU data'}
-    elif resp_type == RESP.ERROR:
-        msg_len = data[1] if len(data) > 1 else 0
-        msg = data[2:2+msg_len].decode('utf-8', errors='ignore') if msg_len > 0 else 'unknown'
-        return {'ok': False, 'error': msg}
-    return {'ok': False, 'error': f'unknown response: {data[:20].hex()}'}
 
 # ============ 连接管理 ============
 def connect(address: str, cmd_port: int = 5555, sub_port: int = 5556):
@@ -134,19 +43,16 @@ def connect(address: str, cmd_port: int = 5555, sub_port: int = 5556):
     _ctx = zmq.Context()
     _address = address
     
-    # DEALER socket：发送命令，接收响应
     _dealer = _ctx.socket(zmq.DEALER)
     _dealer.setsockopt(zmq.RCVTIMEO, 5000)
     _dealer.setsockopt(zmq.SNDTIMEO, 1000)
     _dealer.connect(f"tcp://{address}:{cmd_port}")
     
-    # SUB socket：订阅状态广播
     _sub = _ctx.socket(zmq.SUB)
     _sub.setsockopt(zmq.RCVTIMEO, 100)
     _sub.connect(f"tcp://{address}:{sub_port}")
-    _sub.setsockopt(zmq.SUBSCRIBE, b'')  # 订阅所有
+    _sub.setsockopt(zmq.SUBSCRIBE, b'')
     
-    # 启动接收线程（用于状态广播回调）
     _running = True
     _recv_thread = threading.Thread(target=_receive_loop, daemon=True)
     _recv_thread.start()
@@ -174,89 +80,52 @@ def disconnect():
     _address = None
 
 def _receive_loop():
-    """接收状态广播的后台线程"""
+    """接收状态广播"""
     while _running and _sub:
         try:
             data = _sub.recv()
-            # 解析设备类型
-            for dtype, prefix in DEVICE_PREFIXES.items():
-                if data.startswith(prefix):
-                    payload = data[len(prefix):]
-                    result = _decode_response(payload)
-                    if dtype in _state_callbacks:
-                        try:
-                            _state_callbacks[dtype](result)
-                        except Exception as e:
-                            print(f"✗ 回调异常: {e}")
-                    break
+            try:
+                result = json.loads(data.decode('utf-8'))
+                device = result.get('device', '')
+                if device in _state_callbacks:
+                    _state_callbacks[device](result)
+            except:
+                pass
         except zmq.Again:
             continue
-        except Exception as e:
+        except:
             if _running:
-                print(f"✗ 接收异常: {e}")
+                pass
 
-def _send_and_wait(prefix: bytes, payload: bytes, timeout: float = 1.0) -> Dict:
+def _send_and_wait(msg: dict, timeout: float = 1.0) -> dict:
     """发送命令并等待响应"""
     if not _dealer:
         raise RuntimeError("未连接，请先调用 connect()")
     
     with _lock:
-        # 发送：[empty, prefix + payload]
-        _dealer.send_multipart([b'', prefix + payload])
+        data = json.dumps(msg).encode('utf-8')
+        _dealer.send_multipart([b'', data])
         
-        # 等待响应
         try:
             frames = _dealer.recv_multipart()
             if frames:
-                data = frames[-1]
-                result = _decode_response(data)
-                return result
+                return json.loads(frames[-1].decode('utf-8'))
             return {'ok': False, 'error': 'empty response'}
         except zmq.Again:
             return {'ok': False, 'error': 'timeout'}
         except Exception as e:
             return {'ok': False, 'error': str(e)}
 
-def _send_fire_and_forget(prefix: bytes, payload: bytes):
-    """发送命令，不等待响应（高频控制用）"""
-    global _last_send_time, _send_count, _send_start_time
-    
+def _send_nowait(msg: dict):
+    """发送命令，不等待响应"""
     if not _dealer:
         raise RuntimeError("未连接，请先调用 connect()")
     
-    # 频率限制
-    current_time = time.time()
-    if _send_freq_limit > 0 and _last_send_time > 0:
-        min_interval = 1.0 / _send_freq_limit
-        time_since_last = current_time - _last_send_time
-        if time_since_last < min_interval:
-            sleep_time = min_interval - time_since_last
-            time.sleep(sleep_time)
-            current_time = time.time()
-    
-    # 记录发送前时间用于计算瞬时频率
-    prev_send_time = _last_send_time if _last_send_time > 0 else current_time
-    
-    # 发送数据
-    _dealer.send_multipart([b'', prefix + payload], zmq.NOBLOCK)
-    
-    # 统计频率
-    if _send_count == 0:
-        _send_start_time = current_time
-    _send_count += 1
-    _last_send_time = current_time
-    
-    # 定期打印频率
-    if _send_count % _freq_print_interval == 0:
-        elapsed = current_time - _send_start_time
-        if elapsed > 0:
-            avg_freq = _send_count / elapsed
-            # 瞬时频率：使用本次和上次发送的时间差
-            time_diff = current_time - prev_send_time
-            instant_freq = 1.0 / time_diff if time_diff > 1e-6 else 0
-            print(f"[发送频率] 平均: {avg_freq:.2f} Hz | 瞬时: {instant_freq:.2f} Hz | 总计: {_send_count} 次")
+    data = json.dumps(msg).encode('utf-8')
+    _dealer.send_multipart([b'', data], zmq.NOBLOCK)
+    time.sleep(0.005)
 
-# ============ 客户端API类 ============
+# ============ 关节控制类 ============
 class JointControl:
     """单关节控制"""
     __slots__ = ('_dev', '_jid')
@@ -265,124 +134,173 @@ class JointControl:
         self._dev = device
         self._jid = jid
     
-    def _query(self, cmd: int, attr: str) -> Optional[float]:
-        """通用查询方法"""
-        result = _send_and_wait(self._dev._prefix, _encode_query(cmd, [self._jid]))
-        if result.get('ok') and 'joints' in result:
-            jdata = result['joints'].get(self._jid)
-            return jdata.get(attr) if jdata else None
-        return None
-    
     def SetPosition(self, position: float):
         """设置位置"""
-        _send_fire_and_forget(self._dev._prefix, _encode_position({self._jid: position}))
+        _send_nowait({'device': self._dev.device_type, 'cmd': 'pos', 'joints': {self._jid: position}})
     
     def GetPosition(self) -> Optional[float]:
         """获取位置"""
-        return self._query(CMD.POS_QUERY, 'pos')
+        result = _send_and_wait({'device': self._dev.device_type, 'cmd': 'query', 'jids': [self._jid]})
+        if result.get('ok') and 'joints' in result:
+            jdata = result['joints'].get(str(self._jid))
+            return jdata.get('pos') if jdata else None
+        return None
     
     def GetVelocity(self) -> Optional[float]:
         """获取速度"""
-        return self._query(CMD.VEL_QUERY, 'vel')
+        result = _send_and_wait({'device': self._dev.device_type, 'cmd': 'query', 'jids': [self._jid]})
+        if result.get('ok') and 'joints' in result:
+            jdata = result['joints'].get(str(self._jid))
+            return jdata.get('vel') if jdata else None
+        return None
     
     def GetTorque(self) -> Optional[float]:
         """获取力矩"""
-        return self._query(CMD.TRQ_QUERY, 'tau')
+        result = _send_and_wait({'device': self._dev.device_type, 'cmd': 'query', 'jids': [self._jid]})
+        if result.get('ok') and 'joints' in result:
+            jdata = result['joints'].get(str(self._jid))
+            return jdata.get('tau') if jdata else None
+        return None
     
     def GetState(self) -> Optional[Dict]:
-        """获取关节完整状态"""
-        result = _send_and_wait(self._dev._prefix, _encode_query(CMD.POS_QUERY, [self._jid]))
+        """获取完整状态"""
+        result = _send_and_wait({'device': self._dev.device_type, 'cmd': 'query', 'jids': [self._jid]})
         if result.get('ok') and 'joints' in result:
-            return result['joints'].get(self._jid)
+            return result['joints'].get(str(self._jid))
         return None
     
     def controlMIT(self, kp: Optional[float] = None, kd: Optional[float] = None,
                    q: float = 0, dq: float = 0, tau: float = 0):
         """MIT控制"""
-        _send_fire_and_forget(self._dev._prefix, _encode_mit({self._jid: {'kp': kp, 'kd': kd, 'q': q, 'dq': dq, 'tau': tau}}))
+        _send_nowait({
+            'device': self._dev.device_type,
+            'cmd': 'mit',
+            'joints': {self._jid: {'kp': kp, 'kd': kd, 'q': q, 'dq': dq, 'tau': tau}}
+        })
 
+# ============ 设备类 ============
 class TaksDevice:
     """Taks设备主类"""
     def __init__(self, device_type: str):
-        if device_type not in DEVICE_PREFIXES:
-            raise ValueError(f"不支持的设备类型: {device_type}")
-        
         self.device_type = device_type
-        self._prefix = DEVICE_PREFIXES[device_type]
         
         if not _dealer:
             raise RuntimeError("请先调用 connect() 连接网络")
         
-        # 关节配置表
+        # 关节映射
         joint_map = {
-            "leftarm": (list(range(9, 16)), 9),
-            "rightarm": (list(range(1, 8)), 1),
-            "semibody": ([1,2,3,4,5,6,7, 9,10,11,12,13,14,15, 17,18,19, 20,21,22], None),
+            "leftarm": list(range(9, 16)),
+            "rightarm": list(range(1, 8)),
+            "semibody": [1,2,3,4,5,6,7, 9,10,11,12,13,14,15, 17,18,19, 20,21,22],
         }
-        # 全身模式
+        
         if device_type == "Taks-T1":
             joints = [1,2,3,4,5,6,7, 9,10,11,12,13,14,15, 17,18,19, 20,21,22, 23,24,25,26,27,28, 29,30,31,32,33,34]
-            for i in joints:
-                setattr(self, f"j{i}", JointControl(self, i))
-            self._jstart = None
         else:
-            self._jstart = None
-            for key, (joints, jstart) in joint_map.items():
+            joints = []
+            for key, jlist in joint_map.items():
                 if key in device_type:
-                    for i in joints:
-                        setattr(self, f"j{i}", JointControl(self, i))
-                    self._jstart = jstart
+                    joints = jlist
                     break
         
+        for i in joints:
+            setattr(self, f"j{i}", JointControl(self, i))
     
     def _register(self):
         """注册设备"""
-        msg = f"注册设备：{self.device_type}".encode('utf-8')
-        return _send_and_wait(self._prefix, msg)
+        return _send_and_wait({'device': self.device_type, 'cmd': 'register'})
     
-    def SetPosition(self, j1=None, j2=None, j3=None, j4=None, j5=None, j6=None, j7=None):
-        """批量位置控制"""
-        positions = {'j1': j1, 'j2': j2, 'j3': j3, 'j4': j4, 'j5': j5, 'j6': j6, 'j7': j7}
-        joint_data = {}
-        for key, val in positions.items():
+    def SetPosition(self, **kwargs):
+        """批量位置控制: SetPosition(j1=0.1, j2=0.2, ...)"""
+        joints = {}
+        for key, val in kwargs.items():
             if val is not None and key.startswith('j'):
-                idx = int(key[1:])
-                jid = self._jstart + idx - 1 if self._jstart else idx
-                joint_data[jid] = val
+                jid = int(key[1:])
+                joints[jid] = val
         
-        if joint_data:
-            data = _encode_position(joint_data)
-            _send_fire_and_forget(self._prefix, data)
-    
-    def _query_all(self, cmd: int, attr: str = None) -> Optional[Dict]:
-        """通用批量查询"""
-        result = _send_and_wait(self._prefix, _encode_query(cmd))
-        if not (result.get('ok') and 'joints' in result):
-            return None
-        joints = result['joints']
-        return {jid: state[attr] for jid, state in joints.items()} if attr else joints
+        if joints:
+            _send_nowait({'device': self.device_type, 'cmd': 'pos', 'joints': joints})
     
     def GetPosition(self) -> Optional[Dict[int, float]]:
         """获取所有关节位置"""
-        return self._query_all(CMD.POS_QUERY, 'pos')
+        result = _send_and_wait({'device': self.device_type, 'cmd': 'query', 'jids': []})
+        if result.get('ok') and 'joints' in result:
+            pos_dict = {int(k): v['pos'] for k, v in result['joints'].items()}
+            with _motor_cache_lock:
+                if self.device_type not in _motor_state_cache:
+                    _motor_state_cache[self.device_type] = {}
+                for jid, pos in pos_dict.items():
+                    if jid not in _motor_state_cache[self.device_type]:
+                        _motor_state_cache[self.device_type][jid] = {}
+                    _motor_state_cache[self.device_type][jid]['pos'] = pos
+            return pos_dict
+        # 返回缓存
+        with _motor_cache_lock:
+            if self.device_type in _motor_state_cache:
+                return {jid: state.get('pos', 0.0) for jid, state in _motor_state_cache[self.device_type].items()}
+        return None
     
     def GetVelocity(self) -> Optional[Dict[int, float]]:
         """获取所有关节速度"""
-        return self._query_all(CMD.VEL_QUERY, 'vel')
+        result = _send_and_wait({'device': self.device_type, 'cmd': 'query', 'jids': []})
+        if result.get('ok') and 'joints' in result:
+            vel_dict = {int(k): v['vel'] for k, v in result['joints'].items()}
+            with _motor_cache_lock:
+                if self.device_type not in _motor_state_cache:
+                    _motor_state_cache[self.device_type] = {}
+                for jid, vel in vel_dict.items():
+                    if jid not in _motor_state_cache[self.device_type]:
+                        _motor_state_cache[self.device_type][jid] = {}
+                    _motor_state_cache[self.device_type][jid]['vel'] = vel
+            return vel_dict
+        # 返回缓存
+        with _motor_cache_lock:
+            if self.device_type in _motor_state_cache:
+                return {jid: state.get('vel', 0.0) for jid, state in _motor_state_cache[self.device_type].items()}
+        return None
     
     def GetTorque(self) -> Optional[Dict[int, float]]:
         """获取所有关节力矩"""
-        return self._query_all(CMD.TRQ_QUERY, 'tau')
+        result = _send_and_wait({'device': self.device_type, 'cmd': 'query', 'jids': []})
+        if result.get('ok') and 'joints' in result:
+            tau_dict = {int(k): v['tau'] for k, v in result['joints'].items()}
+            with _motor_cache_lock:
+                if self.device_type not in _motor_state_cache:
+                    _motor_state_cache[self.device_type] = {}
+                for jid, tau in tau_dict.items():
+                    if jid not in _motor_state_cache[self.device_type]:
+                        _motor_state_cache[self.device_type][jid] = {}
+                    _motor_state_cache[self.device_type][jid]['tau'] = tau
+            return tau_dict
+        # 返回缓存
+        with _motor_cache_lock:
+            if self.device_type in _motor_state_cache:
+                return {jid: state.get('tau', 0.0) for jid, state in _motor_state_cache[self.device_type].items()}
+        return None
     
     def GetState(self) -> Optional[Dict[int, Dict]]:
         """获取所有关节完整状态"""
-        return self._query_all(CMD.POS_QUERY)
+        result = _send_and_wait({'device': self.device_type, 'cmd': 'query', 'jids': []})
+        if result.get('ok') and 'joints' in result:
+            state_dict = {int(k): v for k, v in result['joints'].items()}
+            with _motor_cache_lock:
+                _motor_state_cache[self.device_type] = state_dict
+            return state_dict
+        # 返回缓存
+        with _motor_cache_lock:
+            if self.device_type in _motor_state_cache:
+                return _motor_state_cache[self.device_type].copy()
+        return None
     
     def controlMIT(self, joints: dict, kp=None, kd=None, q=None, dq=None, tau=None):
-        """批量MIT控制"""
+        """批量MIT控制
+        
+        Args:
+            joints: {jid: {'kp': ..., 'kd': ..., 'q': ..., 'dq': ..., 'tau': ...}}
+            kp, kd, q, dq, tau: 默认值
+        """
         mit_data = {}
-        for jidx, params in joints.items():
-            jid = (self._jstart + jidx - 1) if self._jstart else jidx
+        for jid, params in joints.items():
             mit_data[jid] = {
                 'kp': params.get('kp', kp),
                 'kd': params.get('kd', kd),
@@ -392,8 +310,7 @@ class TaksDevice:
             }
         
         if mit_data:
-            data = _encode_mit(mit_data)
-            _send_fire_and_forget(self._prefix, data)
+            _send_nowait({'device': self.device_type, 'cmd': 'mit', 'joints': mit_data})
     
     def subscribe_state(self, callback: Callable[[Dict], None]):
         """订阅状态回调"""
@@ -407,59 +324,52 @@ class TaksDevice:
         self.unsubscribe_state()
     
     def __repr__(self):
-        status = f"已连接到 {_address}" if _address else "未连接"
-        return f"<{self.device_type} {status}>"
+        return f"<{self.device_type} {'已连接' if _address else '未连接'}>"
 
+# ============ IMU 设备类 ============
 class IMUDevice:
-    """IMU设备类"""
+    """​IMU设备类"""
     def __init__(self):
         self.device_type = "Taks-T1-imu"
-        self._prefix = DEVICE_PREFIXES[self.device_type]
         if not _dealer:
             raise RuntimeError("请先调用 connect() 连接网络")
     
     def _register(self):
-        """注册设备"""
-        msg = f"注册设备：{self.device_type}".encode('utf-8')
-        return _send_and_wait(self._prefix, msg)
+        return _send_and_wait({'device': self.device_type, 'cmd': 'register'})
     
-    def _query(self, cmd: int) -> Dict:
-        """发送IMU查询命令"""
-        payload = bytes([cmd, 0])
-        return _send_and_wait(self._prefix, payload)
+    def _get_with_cache(self, cmd: str, cache_key: str) -> Optional[Dict]:
+        """获取数据，失败时返回缓存"""
+        result = _send_and_wait({'device': self.device_type, 'cmd': cmd})
+        if result.get('ok'):
+            data = result.get('data')
+            if data:
+                with _imu_cache_lock:
+                    _imu_cache[cache_key] = data
+                return data
+        # 返回缓存
+        with _imu_cache_lock:
+            return _imu_cache.get(cache_key)
     
     def get_ang_vel(self) -> Optional[Dict]:
-        """获取角速度 (rad/s) -> {'x': float, 'y': float, 'z': float}"""
-        result = self._query(CMD.IMU_ANG_VEL)
-        if result.get('ok'):
-            return {'x': result.get('x', 0), 'y': result.get('y', 0), 'z': result.get('z', 0)}
-        return None
+        """获取角速度 -> {'x', 'y', 'z'}"""
+        return self._get_with_cache('ang_vel', 'ang_vel')
     
     def get_lin_acc(self) -> Optional[Dict]:
-        """获取线加速度 (m/s²) -> {'x': float, 'y': float, 'z': float}"""
-        result = self._query(CMD.IMU_LIN_ACC)
-        if result.get('ok'):
-            return {'x': result.get('x', 0), 'y': result.get('y', 0), 'z': result.get('z', 0)}
-        return None
+        """获取线加速度 -> {'x', 'y', 'z'}"""
+        return self._get_with_cache('lin_acc', 'lin_acc')
     
     def get_quat(self) -> Optional[Dict]:
-        """获取四元数 -> {'w': float, 'x': float, 'y': float, 'z': float}"""
-        result = self._query(CMD.IMU_QUAT)
-        if result.get('ok'):
-            return {'w': result.get('w', 1), 'x': result.get('x', 0), 'y': result.get('y', 0), 'z': result.get('z', 0)}
-        return None
+        """获取四元数 -> {'w', 'x', 'y', 'z'}"""
+        return self._get_with_cache('quat', 'quat')
     
     def get_rpy(self) -> Optional[Dict]:
-        """获取欧拉角 (rad) -> {'roll': float, 'pitch': float, 'yaw': float}"""
-        result = self._query(CMD.IMU_RPY)
-        if result.get('ok'):
-            return {'roll': result.get('x', 0), 'pitch': result.get('y', 0), 'yaw': result.get('z', 0)}
-        return None
+        """获取欧拉角 -> {'roll', 'pitch', 'yaw'}"""
+        return self._get_with_cache('rpy', 'rpy')
     
     def calibrate_zero(self) -> bool:
         """角度值标定零位"""
-        result = self._query(CMD.IMU_CAL_ZERO)
-        return result.get('ok', False) and result.get('code', 1) == 0
+        result = _send_and_wait({'device': self.device_type, 'cmd': 'cal_zero'})
+        return result.get('ok', False)
     
     def calibrate_rpy(self) -> bool:
         """陀螺静态校准（别名）"""
@@ -467,32 +377,13 @@ class IMUDevice:
     
     def calibrate_gyro(self) -> bool:
         """陀螺静态校准"""
-        result = self._query(CMD.IMU_CAL_GYRO)
-        return result.get('ok', False) and result.get('code', 1) == 0
+        result = _send_and_wait({'device': self.device_type, 'cmd': 'cal_gyro'})
+        return result.get('ok', False)
     
     def __repr__(self):
-        status = f"已连接到 {_address}" if _address else "未连接"
-        return f"<IMU {status}>"
+        return f"<IMU {'已连接' if _address else '未连接'}>"
 
 # ============ 全局函数 ============
-def set_send_frequency(freq_hz: float):
-    """设置发送频率限制
-    
-    Args:
-        freq_hz: 最大发送频率（Hz），设置为 0 表示不限制
-    """
-    global _send_freq_limit
-    _send_freq_limit = freq_hz
-    print(f"✓ 发送频率限制设置为: {freq_hz} Hz")
-
-def reset_frequency_stats():
-    """重置频率统计"""
-    global _send_count, _send_start_time, _last_send_time
-    _send_count = 0
-    _send_start_time = 0.0
-    _last_send_time = 0.0
-    print("✓ 频率统计已重置")
-
 def register(device_type: str):
     """注册设备"""
     if device_type == "Taks-T1-imu":
