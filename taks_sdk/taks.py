@@ -168,6 +168,42 @@ class TaksDevice:
     def __init__(self, device_type: str):
         self.device_type = device_type
         self.joints = self.JOINT_MAP.get(device_type, [])
+        self._joint_objs: Dict[int, "TaksDevice._JointProxy"] = {}
+    
+    class _JointProxy:
+        """单个关节的便捷访问器"""
+        def __init__(self, device: "TaksDevice", jid: int):
+            self._device = device
+            self._jid = jid
+        
+        def SetPosition(self, pos: float):
+            self._device.SetPosition(**{f'j{self._jid}': pos})
+        
+        def GetPosition(self):
+            state = self._device.GetState()
+            return state[self._jid]['pos'] if state and self._jid in state else None
+        
+        def GetVelocity(self):
+            state = self._device.GetState()
+            return state[self._jid]['vel'] if state and self._jid in state else None
+        
+        def GetTorque(self):
+            state = self._device.GetState()
+            return state[self._jid]['tau'] if state and self._jid in state else None
+        
+        def controlMIT(self, *, q=None, dq=None, tau=None, kp=None, kd=None):
+            cmd = {k: v for k, v in [('q', q), ('dq', dq), ('tau', tau), ('kp', kp), ('kd', kd)] if v is not None}
+            if cmd:
+                self._device.controlMIT({self._jid: cmd})
+    
+    def __getattr__(self, name: str):
+        if name.startswith('j') and name[1:].isdigit():
+            jid = int(name[1:])
+            if jid in self.joints:
+                if jid not in self._joint_objs:
+                    self._joint_objs[jid] = self._JointProxy(self, jid)
+                return self._joint_objs[jid]
+        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
     
     def _register(self):
         return _send({'device': self.device_type, 'cmd': 'register'})
@@ -207,12 +243,23 @@ class IMUDevice:
         return _send({'device': self.device_type, 'cmd': 'register'})
     
     def get_all_data(self) -> Optional[Dict]:
-        """获取全部数据 {'ang_vel', 'lin_acc', 'quat', 'rpy'}"""
         result = _send({'device': self.device_type, 'cmd': 'get_all'})
         if result and result.get('ok') and 'data' in result:
             _imu_cache.update(result['data'])
             return result['data']
         return _imu_cache if _imu_cache else None
+    
+    def get_ang_vel(self) -> Optional[Dict]:
+        data = self.get_all_data()
+        return data.get('ang_vel') if data else _imu_cache.get('ang_vel')
+    
+    def get_lin_acc(self) -> Optional[Dict]:
+        data = self.get_all_data()
+        return data.get('lin_acc') if data else _imu_cache.get('lin_acc')
+    
+    def get_quat(self) -> Optional[Dict]:
+        data = self.get_all_data()
+        return data.get('quat') if data else _imu_cache.get('quat')
     
     def get_rpy(self) -> Optional[Dict]:
         result = _send({'device': self.device_type, 'cmd': 'rpy'})
@@ -222,6 +269,10 @@ class IMUDevice:
     
     def calibrate_zero(self) -> bool:
         result = _send({'device': self.device_type, 'cmd': 'cal_zero'})
+        return result.get('ok', False) if result else False
+
+    def calibrate_gyro(self) -> bool:
+        result = _send({'device': self.device_type, 'cmd': 'cal_gyro'})
         return result.get('ok', False) if result else False
 
 
