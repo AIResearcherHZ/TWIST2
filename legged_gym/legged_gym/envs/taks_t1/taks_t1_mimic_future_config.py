@@ -50,7 +50,7 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             force_scale_min = 0.0
             apply_force_x_range = [-40.0, 40.0]
             apply_force_y_range = [-40.0, 40.0]
-            apply_force_z_range = [-50.0, 5.0]
+            apply_force_z_range = [-50.0, 10.0]
             zero_force_prob = [0.25, 0.25, 0.25]
             randomize_force_duration = [10, 50]
             max_force_estimation = True
@@ -96,7 +96,7 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
 
         push_robots = (True and domain_rand_general)
         push_interval_s = 4
-        max_push_vel_xy = 1.0
+        max_push_vel_xy = 2.0   # 原值1.0
 
         push_end_effector = (False and domain_rand_general)
         push_end_effector_interval_s = 2
@@ -135,6 +135,15 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
     class rewards(TaksT1MimicPrivCfg.rewards):
         # All reward scales can be set to None to completely disable that reward
         # Set any scale to None to skip computing that reward entirely
+        
+        # ==================== 踉跄控制参数 ====================
+        # 收紧termination条件以减少踉跄时间
+        # 原值4.0太宽松(约229°)，收紧到1.0(约57°)可更快终止踉跄状态
+        termination_roll = 1.57   # 原值4.0，收紧以更快检测踉跄
+        termination_pitch = 1.57  # 原值4.0，收紧以更快检测踉跄
+        # 高度差阈值：原值0.3m，收紧到0.25m，以更快检测失衡
+        root_height_diff_threshold = 0.25  # 原值0.3，收紧到0.25m
+        
         class scales:
             tracking_joint_dof = 2.0  # Set to None to disable
             tracking_joint_vel = 0.2  # Set to None to disable
@@ -147,14 +156,14 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             alive = 0.5  # Set to None to disable
             feet_slip = -0.1  # Set to None to disable
             feet_contact_forces = -5e-4  # Set to None to disable
-            feet_stumble = -1.2  # Set to None to disable
+            feet_stumble = -2.0  # 增强踉跄惩罚(原值-1.25)
             dof_pos_limits = -5.0  # Set to None to disable
             dof_torque_limits = -1.0  # Set to None to disable
             dof_vel = -1e-4  # Set to None to disable
             dof_acc = -1e-7  # Set to None to disable
             action_rate = -0.1  # Set to None to disable
             feet_air_time = 5.0  # Set to None to disable
-            ang_vel_xy = -0.02  # Set to None to disable
+            ang_vel_xy = -0.05  # 增强角速度惩罚(原值-0.02)，抑制踉跄时的摇摆
             ankle_dof_acc = -1e-7 * 2  # Set to None to disable(原来是*2)
             ankle_dof_vel = -1e-4 * 2  # Set to None to disable(原来是*2)
             
