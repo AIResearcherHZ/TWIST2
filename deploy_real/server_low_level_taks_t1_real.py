@@ -24,6 +24,7 @@ from rich.live import Live
 
 import taks
 from data_utils.rot_utils import quatToEuler
+from robot_control.fall_detector import FallDetector, FallProtectionController
 
 try:
     import onnxruntime as ort
@@ -216,7 +217,10 @@ class TaksT1RealController:
                  cmd_port=5555,
                  kp_override=None,
                  kd_override=None,
-                 control_freq_override=None):
+                 control_freq_override=None,
+                 fall_protection=True,
+                 fall_roll_threshold=1.0,
+                 fall_pitch_threshold=1.0):
         
         self.device = device
         self.policy = load_onnx_policy(policy_path, device)
@@ -311,6 +315,21 @@ class TaksT1RealController:
         self.last_valid_quat = np.array([1, 0, 0, 0], dtype=np.float32)
         self.last_valid_ang_vel = np.zeros(3, dtype=np.float32)
         self.imu_fail_count = 0
+        
+        # Fall protection
+        self.fall_protection_enabled = fall_protection
+        if fall_protection:
+            self.fall_detector = FallDetector(
+                roll_threshold=fall_roll_threshold,
+                pitch_threshold=fall_pitch_threshold,
+                detection_window=5,
+                detection_ratio=0.6
+            )
+            self.fall_controller = FallProtectionController(self.fall_detector)
+            print(f"Fall protection enabled: roll_threshold={np.degrees(fall_roll_threshold):.1f}°, pitch_threshold={np.degrees(fall_pitch_threshold):.1f}°")
+        else:
+            self.fall_detector = None
+            self.fall_controller = None
         
     def connect_robot(self):
         """连接机器人"""
@@ -697,8 +716,18 @@ class TaksT1RealController:
                 # 应用关节物理限位
                 target_dof_pos = np.clip(target_dof_pos, JOINT_LIMITS_LOWER, JOINT_LIMITS_UPPER)
                 
+                # Fall protection check
+                kp_scale = self.current_kp_scale
+                kd_scale = self.current_kd_scale
+                if self.fall_protection_enabled and self.fall_controller:
+                    kp_scale, kd_scale, is_fallen = self.fall_controller.check_and_protect_from_rpy(rpy[0], rpy[1])
+                    if is_fallen:
+                        print("\n[FALL DETECTED] 检测到跌倒! 断开连接...")
+                        self.shutdown_requested = True
+                        break
+                
                 # 发送控制命令
-                self.send_mit_command(target_dof_pos, self.current_kp_scale, self.current_kd_scale)
+                self.send_mit_command(target_dof_pos, kp_scale, kd_scale)
                 
                 # 计算下一次循环的目标时间
                 next_loop_time += self.target_dt
@@ -743,8 +772,19 @@ def main():
                         help='Taks-T1服务器IP')
     parser.add_argument('--cmd_port', type=int, default=5555,
                         help='命令端口')
+    parser.add_argument('--fall_protection', action='store_true', default=True,
+                        help='Enable fall protection')
+    parser.add_argument('--no_fall_protection', action='store_true',
+                        help='Disable fall protection')
+    parser.add_argument('--fall_roll_threshold', type=float, default=1.0,
+                        help='Fall detection roll threshold in radians (default: 1.0 rad = 57 deg)')
+    parser.add_argument('--fall_pitch_threshold', type=float, default=1.0,
+                        help='Fall detection pitch threshold in radians (default: 1.0 rad = 57 deg)')
     
     args = parser.parse_args()
+    
+    # Handle fall protection flag
+    fall_protection = not args.no_fall_protection
     
     # 验证文件存在
     if not os.path.exists(args.policy):
@@ -759,6 +799,10 @@ def main():
     print(f"  Server: {args.server_ip}:{args.cmd_port}")
     print(f"  缓启动时间: {RAMP_UP_TIME}s")
     print(f"  缓关闭时间: {RAMP_DOWN_TIME}s")
+    print(f"  Fall protection: {fall_protection}")
+    if fall_protection:
+        print(f"  Fall roll threshold: {np.degrees(args.fall_roll_threshold):.1f} deg")
+        print(f"  Fall pitch threshold: {np.degrees(args.fall_pitch_threshold):.1f} deg")
     print("=" * 50)
     
     print("\n安全警告:")
@@ -770,7 +814,10 @@ def main():
         policy_path=args.policy,
         device=args.device,
         server_ip=args.server_ip,
-        cmd_port=args.cmd_port
+        cmd_port=args.cmd_port,
+        fall_protection=fall_protection,
+        fall_roll_threshold=args.fall_roll_threshold,
+        fall_pitch_threshold=args.fall_pitch_threshold
     )
     
     controller.run()
