@@ -50,9 +50,9 @@ RAMP_DOWN_TIME = 5.0
 
 GLOBAL_KP = np.array([
     # 左腿 (6)
-    100, 100, 100, 150, 40, 40,
+    50, 50, 50, 100, 20, 20,
     # 右腿 (6)
-    100, 100, 100, 150, 40, 40,
+    50, 50, 50, 100, 20, 20,
     # 腰部 (3)
     150, 150, 150,
     # 左臂 (7)
@@ -635,7 +635,7 @@ class TaksT1RealController:
                     self.last_action
                 ])
                 
-                print("roll/pitch (rpy):", rpy[:2], "obs_proprio roll/pitch:", obs_proprio[3:5])
+                # print("roll/pitch (rpy):", rpy[:2], "obs_proprio roll/pitch:", obs_proprio[3:5])
                 # 打印关节编号与位置，便于对应 policy idx -> SDK jid
                 # dof_with_idx = [f"{i}:{dof_pos[i]:.4f}" for i in range(self.num_actions)]
                 # print("dof_pos (policy_idx:value):", ", ".join(dof_with_idx))
