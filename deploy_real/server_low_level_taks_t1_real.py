@@ -6,7 +6,7 @@ Taks-T1 Sim2Real 部署脚本
 - 缓关闭(Ctrl+C)：线性5s降kp,kd为0
 """
 import sys
-sys.path.insert(0, '/home/xhz/TWIST2/taks_sdk')
+sys.path.insert(0, '/home/rex/桌面/TWIST2/taks_sdk')
 
 import argparse
 import json
@@ -18,6 +18,8 @@ import redis
 from collections import deque
 from tqdm import tqdm
 import os
+import csv
+from datetime import datetime
 from rich.console import Console
 from rich.table import Table
 from rich.live import Live
@@ -37,8 +39,11 @@ CONTROL_FREQ = 50.0  # Hz
 CONTROL_DT = 1.0 / CONTROL_FREQ  # 秒
 
 # 缓启动/缓关闭时间 (秒)
-RAMP_UP_TIME = 10.0
+RAMP_UP_TIME = 5.0
 RAMP_DOWN_TIME = 5.0
+
+# 缓启动结束后，目标位置从零位平滑过渡到policy输出的时间 (秒)
+TRANSITION_TIME = 2.0
 
 # ============ 全局 KP/KD 配置 ============
 # 左腿: hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll
@@ -50,9 +55,9 @@ RAMP_DOWN_TIME = 5.0
 
 GLOBAL_KP = np.array([
     # 左腿 (6)
-    50, 50, 50, 100, 20, 20,
+    50, 150, 150, 50, 60, 60,
     # 右腿 (6)
-    50, 50, 50, 100, 20, 20,
+    50, 150, 150, 50, 60, 60,
     # 腰部 (3)
     150, 150, 150,
     # 左臂 (7)
@@ -65,15 +70,15 @@ GLOBAL_KP = np.array([
 
 GLOBAL_KD = np.array([
     # 左腿 (6)
-    2, 2, 2, 4, 2, 2,
+    50, 50, 50, 50, 2, 2,
     # 右腿 (6)
-    2, 2, 2, 4, 2, 2,
+    50, 50, 50, 50, 2, 2,
     # 腰部 (3)
-    4, 4, 4,
+    25, 25, 25,
     # 左臂 (7)
-    5, 5, 5, 5, 1, 1, 1,
+    8, 8, 8, 8, 1, 1, 1,
     # 右臂 (7)
-    5, 5, 5, 5, 1, 1, 1,
+    8, 8, 8, 8, 1, 1, 1,
     # 脖子 (3)
     0.1, 0.1, 0.1,
 ], dtype=np.float32)
@@ -302,6 +307,11 @@ class TaksT1RealController:
         self.policy_fps_print_interval = 100
         self.last_policy_time = None
         
+        # CSV logging
+        self.csv_file = None
+        self.csv_writer = None
+        self.csv_start_time = None
+        
         # Default mimic obs
         self.default_mimic_obs = np.concatenate([
             np.array([0, 0]),      # xy velocity
@@ -355,6 +365,62 @@ class TaksT1RealController:
         """断开机器人连接"""
         taks.disconnect()
         print("✓ 已断开连接")
+    
+    def init_csv_logging(self):
+        """初始化CSV日志记录"""
+        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        csv_filename = f"taks_t1_log_{timestamp_str}.csv"
+        self.csv_file = open(csv_filename, 'w', newline='')
+        
+        # 构建CSV表头
+        headers = ['timestamp', 'elapsed_time']
+        
+        # obs_proprio: ang_vel(3) + rpy(2) + dof_pos(32) + dof_vel(32) + last_action(32) = 101
+        headers += [f'ang_vel_{i}' for i in range(3)]
+        headers += ['roll', 'pitch']
+        headers += [f'dof_pos_{i}' for i in range(32)]
+        headers += [f'dof_vel_{i}' for i in range(32)]
+        headers += [f'last_action_{i}' for i in range(32)]
+        
+        # mit_data: 每个关节的 kp, kd, q, dq, tau (32个关节)
+        for policy_idx in range(32):
+            joint_name = JOINT_NAMES.get(policy_idx, f'joint_{policy_idx}')
+            headers += [f'mit_{joint_name}_kp', f'mit_{joint_name}_kd', 
+                       f'mit_{joint_name}_q', f'mit_{joint_name}_dq', f'mit_{joint_name}_tau']
+        
+        self.csv_writer = csv.writer(self.csv_file)
+        self.csv_writer.writerow(headers)
+        self.csv_start_time = time.time()
+        print(f"CSV日志已初始化: {csv_filename}")
+    
+    def log_to_csv(self, obs_proprio, mit_data):
+        """将obs_proprio和mit_data写入CSV"""
+        if self.csv_writer is None:
+            return
+        
+        current_time = time.time()
+        elapsed_time = current_time - self.csv_start_time
+        
+        row = [current_time, elapsed_time]
+        
+        # obs_proprio (101维)
+        row.extend(obs_proprio.tolist())
+        
+        # mit_data (按policy顺序)
+        for policy_idx in range(32):
+            sdk_jid = POLICY_TO_SDK_JOINT_MAP[policy_idx]
+            data = mit_data[sdk_jid]
+            row.extend([data['kp'], data['kd'], data['q'], data['dq'], data['tau']])
+        
+        self.csv_writer.writerow(row)
+    
+    def close_csv_logging(self):
+        """关闭CSV日志文件"""
+        if self.csv_file:
+            self.csv_file.close()
+            self.csv_file = None
+            self.csv_writer = None
+            print("CSV日志已关闭")
         
     def get_robot_state(self):
         """获取机器人状态 - 使用batch_query优化"""
@@ -435,6 +501,8 @@ class TaksT1RealController:
         if self.print_counter >= self.print_interval:
             self.print_counter = 0
             self._print_mit_table(mit_data)
+        
+        return mit_data
     
     def _print_ramp_table(self, dof_pos, target_pos, kp_scale, kd_scale, phase="Ramp"):
         """用rich表格打印缓启动/缓关闭位置信息"""
@@ -603,8 +671,12 @@ class TaksT1RealController:
             print("开始主控制循环...")
             print("按 Ctrl+C 安全退出")
             
+            # 初始化CSV日志
+            self.init_csv_logging()
+            
             step_count = 0
             next_loop_time = time.time()  # 下一次循环的目标时间
+            transition_start_time = time.time()  # 过渡期开始时间
             
             # ========== 注释掉policy执行循环，只测试缓慢启动 ==========
             while self.running and not self.shutdown_requested:
@@ -707,14 +779,25 @@ class TaksT1RealController:
                 #         print(f"Policy Execution FPS (last {self.policy_fps_print_interval} steps): {avg_execution_fps:.2f} Hz (avg interval: {avg_interval*1000:.2f}ms)")
                 # self.last_policy_time = current_time
                 
-                # self.last_action = raw_action.copy()
+                self.last_action = raw_action.copy()
                 
                 # 计算目标位置
                 raw_action = np.clip(raw_action, -5.0, 5.0)
-                target_dof_pos = self.default_dof_pos + raw_action * self.action_scale
+                policy_target_pos = self.default_dof_pos + raw_action * self.action_scale
                 
                 # 应用关节物理限位
-                target_dof_pos = np.clip(target_dof_pos, JOINT_LIMITS_LOWER, JOINT_LIMITS_UPPER)
+                policy_target_pos = np.clip(policy_target_pos, JOINT_LIMITS_LOWER, JOINT_LIMITS_UPPER)
+                
+                # 平滑过渡：从零位平滑过渡到policy输出
+                transition_elapsed = time.time() - transition_start_time
+                if transition_elapsed < TRANSITION_TIME:
+                    # 使用smoothstep曲线进行平滑过渡
+                    t = transition_elapsed / TRANSITION_TIME
+                    blend_ratio = t * t * (3.0 - 2.0 * t)  # smoothstep: 3t² - 2t³
+                    zero_pos = np.zeros(self.num_actions, dtype=np.float32)
+                    target_dof_pos = (1.0 - blend_ratio) * zero_pos + blend_ratio * policy_target_pos
+                else:
+                    target_dof_pos = policy_target_pos
                 
                 # Fall protection check
                 kp_scale = self.current_kp_scale
@@ -727,7 +810,10 @@ class TaksT1RealController:
                         break
                 
                 # 发送控制命令
-                self.send_mit_command(target_dof_pos, kp_scale, kd_scale)
+                mit_data = self.send_mit_command(target_dof_pos, kp_scale, kd_scale)
+                
+                # 记录到CSV
+                self.log_to_csv(obs_proprio, mit_data)
                 
                 # 计算下一次循环的目标时间
                 next_loop_time += self.target_dt
@@ -756,6 +842,9 @@ class TaksT1RealController:
             # 缓关闭
             self.running = False
             self.ramp_down()
+            
+            # 关闭CSV日志
+            self.close_csv_logging()
             
             # 断开连接
             self.disconnect_robot()

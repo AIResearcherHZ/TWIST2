@@ -22,6 +22,9 @@ redis-server --daemonize yes
 bash run_motion_server.sh unitree_g1_with_hands
 bash run_motion_server.sh taks_t1
 
+【SSH】
+taks-t1-controller@192.168.1.208
+
 =================================================================================
                                     训练
 =================================================================================
