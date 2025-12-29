@@ -213,7 +213,7 @@ class TaksT1RealController:
     def __init__(self, 
                  policy_path,
                  device='cuda',
-                 server_ip='192.168.1.208',
+                 server_ip='192.168.36.36',
                  cmd_port=5555,
                  kp_override=None,
                  kd_override=None,
@@ -768,7 +768,7 @@ def main():
                         help='ONNX policy文件路径')
     parser.add_argument('--device', type=str, default='cuda',
                         help='运行设备 (cuda/cpu)')
-    parser.add_argument('--server_ip', type=str, default='192.168.1.208',
+    parser.add_argument('--server_ip', type=str, default='192.168.36.36',
                         help='Taks-T1服务器IP')
     parser.add_argument('--cmd_port', type=int, default=5555,
                         help='命令端口')

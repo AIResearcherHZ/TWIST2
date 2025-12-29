@@ -31,7 +31,7 @@ fi
 net=eno1
 
 # ============ Taks-T1 服务器配置 ============
-server_ip=192.168.1.208
+server_ip=192.168.36.36
 cmd_port=5555
 
 cd deploy_real
