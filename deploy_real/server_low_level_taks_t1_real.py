@@ -55,9 +55,9 @@ TRANSITION_TIME = 2.0
 
 GLOBAL_KP = np.array([
     # 左腿 (6)
-    50, 150, 150, 50, 20, 20,
+    50, 150, 150, 50, 40, 40,
     # 右腿 (6)
-    50, 150, 150, 50, 20, 20,
+    50, 150, 150, 50, 40, 40,
     # 腰部 (3)
     150, 150, 150,
     # 左臂 (7)
@@ -74,11 +74,11 @@ GLOBAL_KD = np.array([
     # 右腿 (6)
     50, 50, 50, 50, 2, 2,
     # 腰部 (3)
-    25, 25, 25,
+    4, 4, 4,
     # 左臂 (7)
-    8, 8, 8, 8, 1, 1, 1,
+    5, 5, 5, 5, 1, 1, 1,
     # 右臂 (7)
-    8, 8, 8, 8, 1, 1, 1,
+    5, 5, 5, 5, 1, 1, 1,
     # 脖子 (3)
     0.1, 0.1, 0.1,
 ], dtype=np.float32)
@@ -261,15 +261,15 @@ class TaksT1RealController:
         # Action scale - 与 taks_t1_sim.py 保持一致，使用数组形式
         self.action_scale = np.array([
             # left leg (6)
-            0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+            0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
             # right leg (6)
-            0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+            0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
             # waist (3)
-            0.2, 0.2, 0.2,
+            0.4, 0.4, 0.4,
             # left arm (7)
-            0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+            0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
             # right arm (7)
-            0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+            0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
             # neck (3) - smaller scale for finer control
             0.3, 0.3, 0.3,
         ], dtype=np.float32)
@@ -859,7 +859,7 @@ class TaksT1RealController:
                 #         print(f"Policy Execution FPS (last {self.policy_fps_print_interval} steps): {avg_execution_fps:.2f} Hz (avg interval: {avg_interval*1000:.2f}ms)")
                 # self.last_policy_time = current_time
                 
-                # self.last_action = raw_action.copy()
+                self.last_action = raw_action.copy()
                 
                 # 计算目标位置 (不对raw_action平滑，与G1保持一致)
                 raw_action = np.clip(raw_action, -5.0, 5.0)
