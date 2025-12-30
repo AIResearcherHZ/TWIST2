@@ -55,9 +55,9 @@ TRANSITION_TIME = 2.0
 
 GLOBAL_KP = np.array([
     # 左腿 (6)
-    50, 150, 150, 50, 60, 60,
+    50, 150, 150, 50, 20, 20,
     # 右腿 (6)
-    50, 150, 150, 50, 60, 60,
+    50, 150, 150, 50, 20, 20,
     # 腰部 (3)
     150, 150, 150,
     # 左臂 (7)
@@ -258,7 +258,22 @@ class TaksT1RealController:
         self.ang_vel_scale = 0.25
         self.dof_vel_scale = 0.05
         self.dof_pos_scale = 1.0
-        self.action_scale = 0.5
+        # Action scale - 与 taks_t1_sim.py 保持一致，使用数组形式
+        self.action_scale = np.array([
+            # left leg (6)
+            0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+            # right leg (6)
+            0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+            # waist (3)
+            0.2, 0.2, 0.2,
+            # left arm (7)
+            0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+            # right arm (7)
+            0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+            # neck (3) - smaller scale for finer control
+            0.3, 0.3, 0.3,
+        ], dtype=np.float32)
+        
         self.ankle_idx = [4, 5, 10, 11]
         
         # Observation structure
@@ -388,13 +403,43 @@ class TaksT1RealController:
             headers += [f'mit_{joint_name}_kp', f'mit_{joint_name}_kd', 
                        f'mit_{joint_name}_q', f'mit_{joint_name}_dq', f'mit_{joint_name}_tau']
         
+        # ========== 新增调试参数 ==========
+        # mimic_obs来源标记 (0=default, 1=redis)
+        headers += ['mimic_obs_source']
+        # mimic_obs (38维): xy_vel(2) + z_pos(1) + roll_pitch(2) + yaw_ang_vel(1) + dof_pos(32)
+        headers += [f'mimic_obs_{i}' for i in range(38)]
+        # raw_action (32维): policy原始输出
+        headers += [f'raw_action_{i}' for i in range(32)]
+        # policy_target_pos (32维): 经过action_scale后的目标位置
+        headers += [f'policy_target_pos_{i}' for i in range(32)]
+        # target_dof_pos (32维): 经过过渡平滑后的最终目标位置
+        headers += [f'target_dof_pos_{i}' for i in range(32)]
+        # blend_ratio: 过渡混合比例
+        headers += ['blend_ratio']
+        # kp_scale, kd_scale: 当前增益缩放
+        headers += ['kp_scale', 'kd_scale']
+        
         self.csv_writer = csv.writer(self.csv_file)
         self.csv_writer.writerow(headers)
         self.csv_start_time = time.time()
         print(f"CSV日志已初始化: {csv_filename}")
     
-    def log_to_csv(self, obs_proprio, mit_data):
-        """将obs_proprio和mit_data写入CSV"""
+    def log_to_csv(self, obs_proprio, mit_data, debug_data=None):
+        """将obs_proprio和mit_data写入CSV
+        
+        Args:
+            obs_proprio: 本体感知观测 (101维)
+            mit_data: MIT控制数据
+            debug_data: 调试数据字典，包含:
+                - mimic_obs_source: 0=default, 1=redis
+                - mimic_obs: mimic观测 (38维)
+                - raw_action: policy原始输出 (32维)
+                - policy_target_pos: 经过action_scale后的目标位置 (32维)
+                - target_dof_pos: 最终目标位置 (32维)
+                - blend_ratio: 过渡混合比例
+                - kp_scale: 当前kp缩放
+                - kd_scale: 当前kd缩放
+        """
         if self.csv_writer is None:
             return
         
@@ -411,6 +456,27 @@ class TaksT1RealController:
             sdk_jid = POLICY_TO_SDK_JOINT_MAP[policy_idx]
             data = mit_data[sdk_jid]
             row.extend([data['kp'], data['kd'], data['q'], data['dq'], data['tau']])
+        
+        # ========== 新增调试参数 ==========
+        if debug_data is not None:
+            row.append(debug_data.get('mimic_obs_source', -1))
+            row.extend(debug_data.get('mimic_obs', np.zeros(38)).tolist())
+            row.extend(debug_data.get('raw_action', np.zeros(32)).tolist())
+            row.extend(debug_data.get('policy_target_pos', np.zeros(32)).tolist())
+            row.extend(debug_data.get('target_dof_pos', np.zeros(32)).tolist())
+            row.append(debug_data.get('blend_ratio', -1))
+            row.append(debug_data.get('kp_scale', -1))
+            row.append(debug_data.get('kd_scale', -1))
+        else:
+            # 填充默认值
+            row.append(-1)  # mimic_obs_source
+            row.extend([0] * 38)  # mimic_obs
+            row.extend([0] * 32)  # raw_action
+            row.extend([0] * 32)  # policy_target_pos
+            row.extend([0] * 32)  # target_dof_pos
+            row.append(-1)  # blend_ratio
+            row.append(-1)  # kp_scale
+            row.append(-1)  # kd_scale
         
         self.csv_writer.writerow(row)
     
@@ -722,9 +788,10 @@ class TaksT1RealController:
                     self.redis_pipeline.set("t_state", int(time.time() * 1000))
                     self.redis_pipeline.execute()
                 
-                # 从Redis获取mimic观测
+                # 从 Redis获取mimic观测
                 action_mimic = self.default_mimic_obs.copy()
                 action_neck = np.zeros(2, dtype=np.float32)
+                mimic_obs_source = 0  # 0=default, 1=redis
                 
                 if self.redis_client:
                     keys = ["action_body_taks_t1", "action_neck_taks_t1"]
@@ -734,13 +801,26 @@ class TaksT1RealController:
                     
                     if redis_results[0] is not None:
                         action_mimic = np.array(json.loads(redis_results[0]), dtype=np.float32)
+                        mimic_obs_source = 1  # 来自Redis
+                        
+                        # 每100步打印一次Redis数据状态
+                        if step_count % 100 == 0:
+                            print(f"[Redis] action_body_taks_t1: len={len(action_mimic)}, first5={action_mimic[:5]}, last5={action_mimic[-5:]}")
+                    else:
+                        if step_count % 100 == 0:
+                            print(f"[Redis] action_body_taks_t1: None, using default_mimic_obs")
+                    
                     if redis_results[1] is not None:
                         action_neck = np.array(json.loads(redis_results[1]), dtype=np.float32)
+                        if step_count % 100 == 0:
+                            print(f"[Redis] action_neck_taks_t1: {action_neck}")
                     
                     # Handle G1 format (35 dims) -> Taks_T1 format (38 dims)
                     if len(action_mimic) == 35:
                         neck_joints = np.array([action_neck[0], 0.0, action_neck[1]], dtype=np.float32)
                         action_mimic = np.concatenate([action_mimic, neck_joints])
+                        if step_count % 100 == 0:
+                            print(f"[Redis] Converted G1 format (35) -> Taks_T1 format (38)")
                 
                 # 构建完整观测
                 obs_full = np.concatenate([action_mimic, obs_proprio])
@@ -779,9 +859,9 @@ class TaksT1RealController:
                 #         print(f"Policy Execution FPS (last {self.policy_fps_print_interval} steps): {avg_execution_fps:.2f} Hz (avg interval: {avg_interval*1000:.2f}ms)")
                 # self.last_policy_time = current_time
                 
-                self.last_action = raw_action.copy()
+                # self.last_action = raw_action.copy()
                 
-                # 计算目标位置
+                # 计算目标位置 (不对raw_action平滑，与G1保持一致)
                 raw_action = np.clip(raw_action, -5.0, 5.0)
                 policy_target_pos = self.default_dof_pos + raw_action * self.action_scale
                 
@@ -797,6 +877,7 @@ class TaksT1RealController:
                     zero_pos = np.zeros(self.num_actions, dtype=np.float32)
                     target_dof_pos = (1.0 - blend_ratio) * zero_pos + blend_ratio * policy_target_pos
                 else:
+                    blend_ratio = 1.0
                     target_dof_pos = policy_target_pos
                 
                 # Fall protection check
@@ -812,8 +893,20 @@ class TaksT1RealController:
                 # 发送控制命令
                 mit_data = self.send_mit_command(target_dof_pos, kp_scale, kd_scale)
                 
+                # 构建调试数据
+                debug_data = {
+                    'mimic_obs_source': mimic_obs_source,
+                    'mimic_obs': action_mimic,
+                    'raw_action': raw_action,
+                    'policy_target_pos': policy_target_pos,
+                    'target_dof_pos': target_dof_pos,
+                    'blend_ratio': blend_ratio,
+                    'kp_scale': kp_scale,
+                    'kd_scale': kd_scale,
+                }
+                
                 # 记录到CSV
-                self.log_to_csv(obs_proprio, mit_data)
+                self.log_to_csv(obs_proprio, mit_data, debug_data)
                 
                 # 计算下一次循环的目标时间
                 next_loop_time += self.target_dt
