@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Taks-T1 Sim2Real 部署脚本
-- 使用 taks SDK 的 MIT 控制模式
-- 缓启动：线性5s升kp,kd站起来
-- 缓关闭(Ctrl+C)：线性5s降kp,kd为0
+Taks-T1 Sim2Real 部署脚本 (重构版 + CSV日志)
+- 位置控制模式 (MIT: kp/kd有值, q有值, dq=0, tau=0)
+- 训练配置: sim.dt=0.002, decimation=10, 控制dt=0.02s=50Hz
+- 缓启动/缓关闭, EMA平滑, 跌倒保护, CSV日志
 """
 import sys
 sys.path.insert(0, '/home/rex/桌面/TWIST2/taks_sdk')
@@ -12,17 +12,15 @@ import argparse
 import json
 import time
 import signal
+import csv
 import numpy as np
 import torch
 import redis
-from collections import deque
-from tqdm import tqdm
 import os
-import csv
+from collections import deque
 from datetime import datetime
 from rich.console import Console
 from rich.table import Table
-from rich.live import Live
 
 import taks
 from data_utils.rot_utils import quatToEuler
@@ -33,104 +31,48 @@ try:
 except ImportError:
     ort = None
 
-# ============ 全局控制参数配置 (方便调试) ============
-# 控制频率
-CONTROL_FREQ = 50.0  # Hz
-CONTROL_DT = 1.0 / CONTROL_FREQ  # 秒
+# ============ 训练配置参数 ============
+SIM_DT = 0.002
+DECIMATION = 10
+CONTROL_DT = SIM_DT * DECIMATION  # 0.02s = 50Hz
+CONTROL_FREQ = 1.0 / CONTROL_DT
 
-# 缓启动/缓关闭时间 (秒)
+# 缓启动/缓关闭时间
 RAMP_UP_TIME = 5.0
 RAMP_DOWN_TIME = 5.0
-
-# 缓启动结束后，目标位置从零位平滑过渡到policy输出的时间 (秒)
 TRANSITION_TIME = 2.0
 
 # ============ 全局 KP/KD 配置 ============
-# 左腿: hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll
-# 右腿: hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll
-# 腰部: yaw, roll, pitch
-# 左臂: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow, wrist_roll, wrist_yaw, wrist_pitch
-# 右臂: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow, wrist_roll, wrist_yaw, wrist_pitch
-# 脖子: yaw, roll, pitch
-
+# 左腿(6), 右腿(6), 腰(3), 左臂(7), 右臂(7), 脖子(3) = 32 DOF
 GLOBAL_KP = np.array([
-    # 左腿 (6)
-    80, 150, 150, 80, 60, 60,
-    # 右腿 (6)
-    80, 150, 150, 80, 60, 60,
-    # 腰部 (3)
-    150, 150, 150,
-    # 左臂 (7)
-    20, 20, 20, 20, 10, 10, 10,
-    # 右臂 (7)
-    20, 20, 20, 20, 10, 10, 10,
-    # 脖子 (3)
-    1, 1, 1,
+    50, 150, 150, 50, 40, 40,  # 左腿
+    50, 150, 150, 50, 40, 40,  # 右腿
+    150, 150, 150,              # 腰部
+    20, 20, 20, 20, 10, 10, 10, # 左臂
+    20, 20, 20, 20, 10, 10, 10, # 右臂
+    1, 1, 1,                    # 脖子
 ], dtype=np.float32)
 
 GLOBAL_KD = np.array([
-    # 左腿 (6)
-    50, 50, 50, 50, 2, 2,
-    # 右腿 (6)
-    50, 50, 50, 50, 2, 2,
-    # 腰部 (3)
-    25, 25, 25,
-    # 左臂 (7)
-    8, 8, 8, 8, 1, 1, 1,
-    # 右臂 (7)
-    8, 8, 8, 8, 1, 1, 1,
-    # 脖子 (3)
-    0.1, 0.1, 0.1,
+    50, 50, 50, 50, 2, 2,      # 左腿
+    50, 50, 50, 50, 2, 2,      # 右腿
+    4, 4, 4,                    # 腰部
+    5, 5, 5, 5, 1, 1, 1,       # 左臂
+    5, 5, 5, 5, 1, 1, 1,       # 右臂
+    0.1, 0.1, 0.1,             # 脖子
 ], dtype=np.float32)
 
-# Taks-T1 关节ID映射 (SDK中的关节编号)
-# 全身关节: 1-7(右臂), 9-15(左臂), 17-19(腰), 20-22(脖子), 23-28(右腿), 29-34(左腿)
-# 但policy输出顺序是: 左腿(6), 右腿(6), 腰(3), 左臂(7), 右臂(7), 脖子(3) = 32 DOF
+# 关节ID映射
 POLICY_TO_SDK_JOINT_MAP = {
-    # 左腿 (policy idx 0-5) -> SDK j29-j34
-    0: 29,  # left_hip_pitch
-    1: 30,  # left_hip_roll
-    2: 31,  # left_hip_yaw
-    3: 32,  # left_knee
-    4: 33,  # left_ankle_pitch
-    5: 34,  # left_ankle_roll
-    # 右腿 (policy idx 6-11) -> SDK j23-j28
-    6: 23,   # right_hip_pitch
-    7: 24,   # right_hip_roll
-    8: 25,   # right_hip_yaw
-    9: 26,   # right_knee
-    10: 27,  # right_ankle_pitch
-    11: 28,  # right_ankle_roll
-    # 腰部 (policy idx 12-14) -> SDK j17-j19
-    12: 17,  # waist_yaw
-    13: 18,  # waist_roll
-    14: 19,  # waist_pitch
-    # 左臂 (policy idx 15-21) -> SDK j9-j15
-    15: 9,   # left_shoulder_pitch
-    16: 10,  # left_shoulder_roll
-    17: 11,  # left_shoulder_yaw
-    18: 12,  # left_elbow
-    19: 13,  # left_wrist_roll
-    20: 14,  # left_wrist_yaw
-    21: 15,  # left_wrist_pitch
-    # 右臂 (policy idx 22-28) -> SDK j1-j7
-    22: 1,   # right_shoulder_pitch
-    23: 2,   # right_shoulder_roll
-    24: 3,   # right_shoulder_yaw
-    25: 4,   # right_elbow
-    26: 5,   # right_wrist_roll
-    27: 6,   # right_wrist_yaw
-    28: 7,   # right_wrist_pitch
-    # 脖子 (policy idx 29-31) -> SDK j20-j22
-    29: 20,  # neck_yaw
-    30: 21,  # neck_roll
-    31: 22,  # neck_pitch
+    0: 29, 1: 30, 2: 31, 3: 32, 4: 33, 5: 34,   # 左腿
+    6: 23, 7: 24, 8: 25, 9: 26, 10: 27, 11: 28, # 右腿
+    12: 17, 13: 18, 14: 19,                      # 腰部
+    15: 9, 16: 10, 17: 11, 18: 12, 19: 13, 20: 14, 21: 15,  # 左臂
+    22: 1, 23: 2, 24: 3, 25: 4, 26: 5, 27: 6, 28: 7,        # 右臂
+    29: 20, 30: 21, 31: 22,                      # 脖子
 }
-
-# SDK关节ID到policy索引的反向映射
 SDK_TO_POLICY_JOINT_MAP = {v: k for k, v in POLICY_TO_SDK_JOINT_MAP.items()}
 
-# 关节名称映射
 JOINT_NAMES = {
     0: "L_hip_pitch", 1: "L_hip_roll", 2: "L_hip_yaw", 3: "L_knee", 4: "L_ankle_pitch", 5: "L_ankle_roll",
     6: "R_hip_pitch", 7: "R_hip_roll", 8: "R_hip_yaw", 9: "R_knee", 10: "R_ankle_pitch", 11: "R_ankle_roll",
@@ -142,773 +84,512 @@ JOINT_NAMES = {
     29: "neck_yaw", 30: "neck_roll", 31: "neck_pitch",
 }
 
-# 关节物理限位 (从 Taks_T1_sim2sim.xml 提取，单位：弧度)
-# 顺序与 policy 输出一致
+# 关节物理限位
 JOINT_LIMITS_LOWER = np.array([
-    # 左腿 (6)
     -2.5307, -0.5236, -2.7576, -0.087267, -0.55267, -0.2618,
-    # 右腿 (6)
     -2.5307, -2.9671, -2.7576, -0.087267, -0.55267, -0.2618,
-    # 腰部 (3)
     -2.618, -0.52, -0.52,
-    # 左臂 (7)
     -2.0, -0.2, -2.58, -0.7, -2.67, -0.9, -0.9,
-    # 右臂 (7)
     -2.0, -2.2515, -2.58, -0.7, -2.67, -0.9, -0.9,
-    # 脖子 (3)
     -1.57, -0.87, 0.0,
 ], dtype=np.float32)
 
 JOINT_LIMITS_UPPER = np.array([
-    # 左腿 (6)
     2.8798, 2.9671, 2.7576, 2.8798, 0.5236, 0.2618,
-    # 右腿 (6)
     2.8798, 0.5236, 2.7576, 2.8798, 0.5236, 0.2618,
-    # 腰部 (3)
     2.618, 0.52, 0.52,
-    # 左臂 (7)
     2.0, 2.2515, 2.58, 1.57, 2.67, 0.9, 0.9,
-    # 右臂 (7)
     2.0, 0.2, 2.58, 1.57, 2.67, 0.9, 0.9,
-    # 脖子 (3)
     1.57, 0.87, 0.50,
 ], dtype=np.float32)
 
 
-class OnnxPolicyWrapper:
-    """Minimal wrapper so ONNXRuntime policies mimic TorchScript call signature."""
+class EMASmoother:
+    """EMA平滑器"""
+    def __init__(self, alpha=0.1):
+        self.alpha = alpha
+        self.value = None
+        
+    def smooth(self, new_value):
+        if self.value is None:
+            self.value = new_value.copy()
+        else:
+            self.value = self.alpha * new_value + (1 - self.alpha) * self.value
+        return self.value
+    
+    def reset(self):
+        self.value = None
 
-    def __init__(self, session, input_name, output_index=0):
+
+class OnnxPolicyWrapper:
+    """ONNX策略包装器"""
+    def __init__(self, session, input_name):
         self.session = session
         self.input_name = input_name
-        self.output_index = output_index
 
-    def __call__(self, obs_tensor: torch.Tensor) -> torch.Tensor:
-        if isinstance(obs_tensor, torch.Tensor):
-            obs_np = obs_tensor.detach().cpu().numpy()
-        else:
-            obs_np = np.asarray(obs_tensor, dtype=np.float32)
-        outputs = self.session.run(None, {self.input_name: obs_np})
-        result = outputs[self.output_index]
-        if not isinstance(result, np.ndarray):
-            result = np.asarray(result, dtype=np.float32)
-        return torch.from_numpy(result.astype(np.float32))
+    def __call__(self, obs_tensor):
+        obs_np = obs_tensor.detach().cpu().numpy() if isinstance(obs_tensor, torch.Tensor) else np.asarray(obs_tensor, dtype=np.float32)
+        return torch.from_numpy(self.session.run(None, {self.input_name: obs_np})[0].astype(np.float32))
 
 
-def load_onnx_policy(policy_path: str, device: str) -> OnnxPolicyWrapper:
+def load_onnx_policy(policy_path, device):
     if ort is None:
-        raise ImportError("onnxruntime is required for ONNX policy inference but is not installed.")
-    providers = []
-    available = ort.get_available_providers()
-    if device.startswith('cuda'):
-        if 'CUDAExecutionProvider' in available:
-            providers.append('CUDAExecutionProvider')
-        else:
-            print("CUDAExecutionProvider not available in onnxruntime; falling back to CPUExecutionProvider.")
-    providers.append('CPUExecutionProvider')
+        raise ImportError("onnxruntime is required")
+    providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if device.startswith('cuda') else ['CPUExecutionProvider']
     session = ort.InferenceSession(policy_path, providers=providers)
-    input_name = session.get_inputs()[0].name
-    print(f"ONNX policy loaded from {policy_path} using providers: {session.get_providers()}")
-    return OnnxPolicyWrapper(session, input_name)
+    print(f"ONNX policy loaded: {policy_path}, providers: {session.get_providers()}")
+    return OnnxPolicyWrapper(session, session.get_inputs()[0].name)
 
 
 class TaksT1RealController:
-    """Taks-T1 真机控制器"""
+    """Taks-T1 真机控制器 (带CSV日志)"""
     
-    def __init__(self, 
-                 policy_path,
-                 device='cuda',
-                 server_ip='192.168.36.36',
-                 cmd_port=5555,
-                 kp_override=None,
-                 kd_override=None,
-                 control_freq_override=None,
-                 fall_protection=True,
-                 fall_roll_threshold=1.0,
-                 fall_pitch_threshold=1.0):
-        
+    def __init__(self, policy_path, device='cuda', server_ip='192.168.36.36', cmd_port=5555,
+                 smooth_body=0.0, fall_protection=True, fall_roll_threshold=1.0, fall_pitch_threshold=1.0):
         self.device = device
         self.policy = load_onnx_policy(policy_path, device)
         self.server_ip = server_ip
         self.cmd_port = cmd_port
         
-        # 使用全局变量或覆盖值
-        self.kp = kp_override if kp_override is not None else GLOBAL_KP.copy()
-        self.kd = kd_override if kd_override is not None else GLOBAL_KD.copy()
-        self.control_freq = control_freq_override if control_freq_override is not None else CONTROL_FREQ
-        self.control_dt = 1.0 / self.control_freq
+        self.kp = GLOBAL_KP.copy()
+        self.kd = GLOBAL_KD.copy()
+        self.control_dt = CONTROL_DT
+        self.num_actions = 32
+        self.default_dof_pos = np.zeros(self.num_actions, dtype=np.float32)
         
-        # Redis for motion server communication
+        # 缩放因子 (与训练配置一致)
+        self.ang_vel_scale = 0.25
+        self.dof_vel_scale = 0.05
+        self.dof_pos_scale = 1.0
+        self.action_scale = np.full(self.num_actions, 0.5, dtype=np.float32)
+        self.ankle_idx = [4, 5, 10, 11]
+        
+        # 观测结构
+        self.n_mimic_obs = 38
+        self.n_proprio = 101
+        self.n_obs_single = self.n_mimic_obs + self.n_proprio
+        self.history_len = 10
+        self.total_obs_size = self.n_obs_single * (self.history_len + 1) + self.n_mimic_obs
+        
+        # 历史缓冲
+        self.proprio_history_buf = deque(maxlen=self.history_len)
+        for _ in range(self.history_len):
+            self.proprio_history_buf.append(np.zeros(self.n_obs_single, dtype=np.float32))
+        self.last_action = np.zeros(self.num_actions, dtype=np.float32)
+        
+        # 默认mimic观测
+        self.default_mimic_obs = np.concatenate([
+            np.array([0, 0, 0.75, 0, 0, 0]),
+            self.default_dof_pos
+        ]).astype(np.float32)
+        
+        # IMU缓存
+        self.last_valid_quat = np.array([1, 0, 0, 0], dtype=np.float32)
+        self.last_valid_ang_vel = np.zeros(3, dtype=np.float32)
+        
+        # Redis
         self.redis_client = None
         try:
             self.redis_client = redis.Redis(host='localhost', port=6379, db=0)
             self.redis_pipeline = self.redis_client.pipeline()
         except Exception as e:
-            print(f"Warning: Redis connection failed: {e}")
+            print(f"Redis连接失败: {e}")
         
-        # Robot state
-        self.robot = None
-        self.imu = None
-        self.num_actions = 32
+        # EMA平滑
+        self.body_smoother = EMASmoother(alpha=smooth_body) if smooth_body > 0.0 else None
+        if self.body_smoother:
+            print(f"EMA平滑已启用: alpha={smooth_body}")
         
-        # Default positions (all zeros for Taks-T1)
-        self.default_dof_pos = np.zeros(self.num_actions, dtype=np.float32)
+        # 跌倒保护
+        self.fall_protection_enabled = fall_protection
+        if fall_protection:
+            self.fall_detector = FallDetector(roll_threshold=fall_roll_threshold, pitch_threshold=fall_pitch_threshold)
+            self.fall_controller = FallProtectionController(self.fall_detector)
+            print(f"跌倒保护已启用: roll={np.degrees(fall_roll_threshold):.1f}°, pitch={np.degrees(fall_pitch_threshold):.1f}°")
+        else:
+            self.fall_detector = self.fall_controller = None
         
-        # Scaling factors
-        self.ang_vel_scale = 0.25
-        self.dof_vel_scale = 0.05
-        self.dof_pos_scale = 1.0
-        self.action_scale = 0.5
-        self.ankle_idx = [4, 5, 10, 11]
-        
-        # Observation structure
-        self.n_mimic_obs = 38  # 6 + 32
-        self.n_proprio = 3 + 2 + 3 * 32  # ang_vel(3) + rpy(2) + dof_pos(32) + dof_vel(32) + last_action(32)
-        self.n_obs_single = self.n_mimic_obs + self.n_proprio  # 38 + 101 = 139
-        self.history_len = 10
-        self.total_obs_size = self.n_obs_single * (self.history_len + 1) + self.n_mimic_obs  # 139*11 + 38 = 1567
-        
-        print(f"Taks-T1 Real Controller Configuration:")
-        print(f"  Control Frequency: {self.control_freq:.1f} Hz (dt={self.control_dt:.4f}s)")
-        print(f"  KP range: [{self.kp.min():.1f}, {self.kp.max():.1f}]")
-        print(f"  KD range: [{self.kd.min():.1f}, {self.kd.max():.1f}]")
-        print(f"  n_mimic_obs: {self.n_mimic_obs}")
-        print(f"  n_proprio: {self.n_proprio}")
-        print(f"  n_obs_single: {self.n_obs_single}")
-        print(f"  history_len: {self.history_len}")
-        print(f"  total_obs_size: {self.total_obs_size}")
-        
-        # History buffer
-        self.proprio_history_buf = deque(maxlen=self.history_len)
-        for _ in range(self.history_len):
-            self.proprio_history_buf.append(np.zeros(self.n_obs_single, dtype=np.float32))
-        
-        self.last_action = np.zeros(self.num_actions, dtype=np.float32)
-        
-        # Control state
+        # 控制状态
+        self.robot = self.imu = None
         self.running = False
         self.shutdown_requested = False
         self.current_kp_scale = 0.0
         self.current_kd_scale = 0.0
         
-        # 频率统计（记录调用时间点，用于计算间隔）
-        self.get_state_timestamps = deque(maxlen=100)
-        self.control_mit_timestamps = deque(maxlen=100)
+        # 频率统计
         self.loop_timestamps = deque(maxlen=100)
-        self.loop_times = []  # 记录每次循环的实际耗时
         self.console = Console()
         self.print_counter = 0
-        self.print_interval = int(self.control_freq)  # 每秒打印一次表格
-        self.target_dt = self.control_dt  # 目标控制周期
+        self.print_interval = int(CONTROL_FREQ)
         
-        # Policy execution FPS tracking (similar to sim)
-        self.policy_execution_times = []
-        self.policy_step_count = 0
-        self.policy_fps_print_interval = 100
-        self.last_policy_time = None
-        
-        # CSV logging
+        # CSV日志
         self.csv_file = None
         self.csv_writer = None
         self.csv_start_time = None
         
-        # Default mimic obs
-        self.default_mimic_obs = np.concatenate([
-            np.array([0, 0]),      # xy velocity
-            np.array([0.75]),      # z position
-            np.array([0, 0]),      # roll/pitch
-            np.array([0]),         # yaw angular velocity
-            self.default_dof_pos   # 32 DOF
-        ]).astype(np.float32)
-        
-        # IMU 数据缓存 (用于处理通信丢包)
-        self.last_valid_quat = np.array([1, 0, 0, 0], dtype=np.float32)
-        self.last_valid_ang_vel = np.zeros(3, dtype=np.float32)
-        self.imu_fail_count = 0
-        
-        # Fall protection
-        self.fall_protection_enabled = fall_protection
-        if fall_protection:
-            self.fall_detector = FallDetector(
-                roll_threshold=fall_roll_threshold,
-                pitch_threshold=fall_pitch_threshold,
-                detection_window=5,
-                detection_ratio=0.6
-            )
-            self.fall_controller = FallProtectionController(self.fall_detector)
-            print(f"Fall protection enabled: roll_threshold={np.degrees(fall_roll_threshold):.1f}°, pitch_threshold={np.degrees(fall_pitch_threshold):.1f}°")
-        else:
-            self.fall_detector = None
-            self.fall_controller = None
+        print(f"控制配置: dt={self.control_dt:.4f}s ({CONTROL_FREQ:.0f}Hz), sim_dt={SIM_DT}, decimation={DECIMATION}")
+        print(f"观测维度: mimic={self.n_mimic_obs}, proprio={self.n_proprio}, total={self.total_obs_size}")
         
     def connect_robot(self):
-        """连接机器人"""
-        print(f"连接到 Taks-T1 服务器: {self.server_ip}:{self.cmd_port}")
+        print(f"连接 Taks-T1: {self.server_ip}:{self.cmd_port}")
         taks.connect(self.server_ip, cmd_port=self.cmd_port)
-        
-        print("注册 Taks-T1 设备...")
         self.robot = taks.register("Taks-T1")
-        print("✓ Taks-T1 注册成功")
         time.sleep(0.5)
-        
-        print("注册 Taks-T1-imu 设备...")
         self.imu = taks.register("Taks-T1-imu")
-        print("✓ Taks-T1-imu 注册成功")
-        
-        print("等待5秒后开始控制...")
+        print("等待5秒...")
         for i in range(5, 0, -1):
             print(f"  {i}...")
             time.sleep(1)
-        print("开始控制!")
         
     def disconnect_robot(self):
-        """断开机器人连接"""
         taks.disconnect()
-        print("✓ 已断开连接")
+        print("已断开连接")
     
     def init_csv_logging(self):
-        """初始化CSV日志记录"""
-        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-        csv_filename = f"taks_t1_log_{timestamp_str}.csv"
-        self.csv_file = open(csv_filename, 'w', newline='')
+        """初始化CSV日志"""
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"taks_t1_log_{ts}.csv"
+        self.csv_file = open(filename, 'w', newline='')
         
-        # 构建CSV表头
         headers = ['timestamp', 'elapsed_time']
-        
-        # obs_proprio: ang_vel(3) + rpy(2) + dof_pos(32) + dof_vel(32) + last_action(32) = 101
         headers += [f'ang_vel_{i}' for i in range(3)]
         headers += ['roll', 'pitch']
         headers += [f'dof_pos_{i}' for i in range(32)]
         headers += [f'dof_vel_{i}' for i in range(32)]
         headers += [f'last_action_{i}' for i in range(32)]
         
-        # mit_data: 每个关节的 kp, kd, q, dq, tau (32个关节)
-        for policy_idx in range(32):
-            joint_name = JOINT_NAMES.get(policy_idx, f'joint_{policy_idx}')
-            headers += [f'mit_{joint_name}_kp', f'mit_{joint_name}_kd', 
-                       f'mit_{joint_name}_q', f'mit_{joint_name}_dq', f'mit_{joint_name}_tau']
+        for idx in range(32):
+            name = JOINT_NAMES.get(idx, f'j{idx}')
+            headers += [f'mit_{name}_kp', f'mit_{name}_kd', f'mit_{name}_q', f'mit_{name}_dq', f'mit_{name}_tau']
+        
+        headers += ['mimic_obs_source']
+        headers += [f'mimic_obs_{i}' for i in range(38)]
+        headers += [f'raw_action_{i}' for i in range(32)]
+        headers += [f'policy_target_{i}' for i in range(32)]
+        headers += [f'target_dof_pos_{i}' for i in range(32)]
+        headers += ['blend_ratio', 'kp_scale', 'kd_scale']
         
         self.csv_writer = csv.writer(self.csv_file)
         self.csv_writer.writerow(headers)
         self.csv_start_time = time.time()
-        print(f"CSV日志已初始化: {csv_filename}")
+        print(f"CSV日志: {filename}")
     
-    def log_to_csv(self, obs_proprio, mit_data):
-        """将obs_proprio和mit_data写入CSV"""
-        if self.csv_writer is None:
+    def log_to_csv(self, obs_proprio, mit_data, debug_data):
+        """写入CSV日志"""
+        if not self.csv_writer:
             return
         
-        current_time = time.time()
-        elapsed_time = current_time - self.csv_start_time
-        
-        row = [current_time, elapsed_time]
-        
-        # obs_proprio (101维)
+        now = time.time()
+        row = [now, now - self.csv_start_time]
         row.extend(obs_proprio.tolist())
         
-        # mit_data (按policy顺序)
-        for policy_idx in range(32):
-            sdk_jid = POLICY_TO_SDK_JOINT_MAP[policy_idx]
-            data = mit_data[sdk_jid]
-            row.extend([data['kp'], data['kd'], data['q'], data['dq'], data['tau']])
+        for idx in range(32):
+            d = mit_data[POLICY_TO_SDK_JOINT_MAP[idx]]
+            row.extend([d['kp'], d['kd'], d['q'], d['dq'], d['tau']])
+        
+        row.append(debug_data.get('mimic_obs_source', -1))
+        row.extend(debug_data.get('mimic_obs', np.zeros(38)).tolist())
+        row.extend(debug_data.get('raw_action', np.zeros(32)).tolist())
+        row.extend(debug_data.get('policy_target', np.zeros(32)).tolist())
+        row.extend(debug_data.get('target_dof_pos', np.zeros(32)).tolist())
+        row.append(debug_data.get('blend_ratio', -1))
+        row.append(debug_data.get('kp_scale', -1))
+        row.append(debug_data.get('kd_scale', -1))
         
         self.csv_writer.writerow(row)
     
     def close_csv_logging(self):
-        """关闭CSV日志文件"""
         if self.csv_file:
             self.csv_file.close()
             self.csv_file = None
-            self.csv_writer = None
             print("CSV日志已关闭")
-        
+    
     def get_robot_state(self):
-        """获取机器人状态 - 使用batch_query优化"""
-        # ========== 并行查询电机和IMU ==========
         joint_states, imu_data = taks.batch_query(self.robot, self.imu)
         
-        # 解析关节位置和速度 (按policy顺序排列)
         dof_pos = np.zeros(self.num_actions, dtype=np.float32)
         dof_vel = np.zeros(self.num_actions, dtype=np.float32)
         
         if joint_states:
             for sdk_jid, state in joint_states.items():
                 if sdk_jid in SDK_TO_POLICY_JOINT_MAP:
-                    policy_idx = SDK_TO_POLICY_JOINT_MAP[sdk_jid]
-                    dof_pos[policy_idx] = state.get('pos', 0.0)
-                    dof_vel[policy_idx] = state.get('vel', 0.0)
+                    idx = SDK_TO_POLICY_JOINT_MAP[sdk_jid]
+                    dof_pos[idx] = state.get('pos', 0.0)
+                    dof_vel[idx] = state.get('vel', 0.0)
         
-        # 解析IMU数据 - 使用缓存机制处理通信丢包
-        quat_valid = False
-        ang_vel_valid = False
+        quat = self.last_valid_quat.copy()
+        ang_vel = self.last_valid_ang_vel.copy()
         
-        if imu_data is not None:
-            # 解析四元数 (w, x, y, z)
+        if imu_data:
             quat_data = imu_data.get('quat')
-            if quat_data and isinstance(quat_data, dict) and 'w' in quat_data:
-                quat = np.array([quat_data['w'], quat_data['x'], quat_data['y'], quat_data['z']], dtype=np.float32)
-                # 检查是否为有效数据 (非全零)
-                if np.abs(quat).sum() > 0.1:  # 有效四元数模长约为1
-                    self.last_valid_quat = quat.copy()
-                    quat_valid = True
-            
-            # 解析角速度
+            if quat_data and 'w' in quat_data:
+                q = np.array([quat_data['w'], quat_data['x'], quat_data['y'], quat_data['z']], dtype=np.float32)
+                if np.abs(q).sum() > 0.1:
+                    self.last_valid_quat = quat = q
             ang_vel_data = imu_data.get('ang_vel')
-            if ang_vel_data and isinstance(ang_vel_data, dict) and 'x' in ang_vel_data:
-                ang_vel = np.array([ang_vel_data['x'], ang_vel_data['y'], ang_vel_data['z']], dtype=np.float32)
-                self.last_valid_ang_vel = ang_vel.copy()
-                ang_vel_valid = True
-        
-        # 使用缓存数据
-        if not quat_valid:
-            quat = self.last_valid_quat.copy()
-            self.imu_fail_count += 1
-        
-        if not ang_vel_valid:
-            ang_vel = self.last_valid_ang_vel.copy()
-        
-        # 记录get时间点
-        self.get_state_timestamps.append(time.time())
+            if ang_vel_data and 'x' in ang_vel_data:
+                self.last_valid_ang_vel = ang_vel = np.array([ang_vel_data['x'], ang_vel_data['y'], ang_vel_data['z']], dtype=np.float32)
         
         return dof_pos, dof_vel, quat, ang_vel
     
     def send_mit_command(self, target_pos, kp_scale, kd_scale):
-        """发送MIT控制命令"""
-        # 构建MIT控制数据
+        """发送MIT控制命令 (位置控制: q有值, dq=0, tau=0)"""
         mit_data = {}
-        for policy_idx in range(self.num_actions):
-            sdk_jid = POLICY_TO_SDK_JOINT_MAP[policy_idx]
+        for idx in range(self.num_actions):
+            sdk_jid = POLICY_TO_SDK_JOINT_MAP[idx]
             mit_data[sdk_jid] = {
-                'kp': float(self.kp[policy_idx] * kp_scale),
-                'kd': float(self.kd[policy_idx] * kd_scale),
-                'q': float(target_pos[policy_idx]),
+                'kp': float(self.kp[idx] * kp_scale),
+                'kd': float(self.kd[idx] * kd_scale),
+                'q': float(target_pos[idx]),
                 'dq': 0.0,
                 'tau': 0.0
             }
-        
-        # DEBUG: 打印所有关节的目标位置
-        # print(f"[DEBUG send_mit_command] kp_scale: {kp_scale}")
-        # print(f"[DEBUG send_mit_command] kd_scale: {kd_scale}")
-        # print(f"[DEBUG send_mit_command] target_pos: {target_pos}")
-        # print(f"[DEBUG send_mit_command] mit_data sample (jid=11): {mit_data.get(11)}")
-        
-        # 发送命令
         self.robot.controlMIT(joints=mit_data)
-        self.control_mit_timestamps.append(time.time())
-        
-        # 每隔一定次数打印MIT数据表格
-        self.print_counter += 1
-        if self.print_counter >= self.print_interval:
-            self.print_counter = 0
-            self._print_mit_table(mit_data)
-        
         return mit_data
     
-    def _print_ramp_table(self, dof_pos, target_pos, kp_scale, kd_scale, phase="Ramp"):
-        """用rich表格打印缓启动/缓关闭位置信息"""
-        table = Table(title=f"{phase} | KP Scale: {kp_scale:.2f} | KD Scale: {kd_scale:.2f}")
-        table.add_column("Policy ID", style="cyan", justify="center")
-        table.add_column("SDK ID", style="magenta", justify="center")
-        table.add_column("Name", style="green")
-        table.add_column("Current Pos", style="yellow", justify="right")
-        table.add_column("Target Pos", style="blue", justify="right")
-        table.add_column("Error", style="red", justify="right")
+    def _print_table(self, mit_data, phase=""):
+        def calc_freq(ts):
+            if len(ts) < 2: return 0.0
+            return 1.0 / np.mean(np.diff(list(ts)))
         
-        for policy_idx in range(self.num_actions):
-            sdk_jid = POLICY_TO_SDK_JOINT_MAP[policy_idx]
-            error = dof_pos[policy_idx] - target_pos[policy_idx]
-            table.add_row(
-                str(policy_idx),
-                str(sdk_jid),
-                JOINT_NAMES.get(policy_idx, "unknown"),
-                f"{dof_pos[policy_idx]:.4f}",
-                f"{target_pos[policy_idx]:.4f}",
-                f"{error:.4f}"
-            )
+        loop_freq = calc_freq(self.loop_timestamps)
+        table = Table(title=f"{phase} | Loop: {loop_freq:.1f}/{CONTROL_FREQ:.0f}Hz")
+        table.add_column("ID", style="cyan", justify="center")
+        table.add_column("SDK", style="magenta", justify="center")
+        table.add_column("Name", style="green")
+        table.add_column("Pos", style="yellow", justify="right")
+        table.add_column("KP", style="blue", justify="right")
+        table.add_column("KD", style="blue", justify="right")
+        
+        for idx in range(self.num_actions):
+            sdk_jid = POLICY_TO_SDK_JOINT_MAP[idx]
+            d = mit_data[sdk_jid]
+            table.add_row(str(idx), str(sdk_jid), JOINT_NAMES.get(idx, "?"),
+                         f"{d['q']:.4f}", f"{d['kp']:.1f}", f"{d['kd']:.1f}")
         
         self.console.clear()
         self.console.print(table)
     
     def ramp_up(self):
-        """缓启动：线性5s升kp,kd，目标位置固定为0.0"""
-        print(f"缓启动中 ({RAMP_UP_TIME}s)...")
-        start_time = time.time()
-        step_count = 0
-        print_interval = int(self.control_freq)  # 每秒打印一次
-        
-        # 目标位置固定为全零
+        print(f"缓启动 ({RAMP_UP_TIME}s)...")
+        start = time.time()
         target_pos = np.zeros(self.num_actions, dtype=np.float32)
         
         while True:
-            elapsed = time.time() - start_time
+            elapsed = time.time() - start
             if elapsed >= RAMP_UP_TIME:
-                self.current_kp_scale = 1.0
-                self.current_kd_scale = 1.0
+                self.current_kp_scale = self.current_kd_scale = 1.0
                 break
             
-            # 线性插值
-            self.current_kp_scale = elapsed / RAMP_UP_TIME
-            self.current_kd_scale = elapsed / RAMP_UP_TIME
+            self.current_kp_scale = self.current_kd_scale = elapsed / RAMP_UP_TIME
+            self.get_robot_state()
+            mit_data = self.send_mit_command(target_pos, self.current_kp_scale, self.current_kd_scale)
             
-            # 获取当前状态
-            dof_pos, _, _, _ = self.get_robot_state()
-            # 发送固定的零位置目标
-            self.send_mit_command(target_pos, self.current_kp_scale, self.current_kd_scale)
-            
-            # 每隔一定次数打印表格
-            step_count += 1
-            if step_count >= print_interval:
-                step_count = 0
-                self._print_ramp_table(dof_pos, target_pos, 
-                                      self.current_kp_scale, self.current_kd_scale, 
-                                      phase=f"Ramp Up ({elapsed:.1f}s/{RAMP_UP_TIME}s)")
+            self.print_counter += 1
+            if self.print_counter >= self.print_interval:
+                self.print_counter = 0
+                self._print_table(mit_data, f"Ramp Up {elapsed:.1f}s/{RAMP_UP_TIME}s")
             
             time.sleep(self.control_dt)
-        
-        print(f"\n✓ 缓启动完成")
+        print("✓ 缓启动完成")
     
     def ramp_down(self):
-        """缓关闭：线性5s降kp,kd为0，目标位置固定为0.0"""
-        print(f"\n缓关闭中 ({RAMP_DOWN_TIME}s)...")
-        start_time = time.time()
-        initial_kp_scale = self.current_kp_scale
-        initial_kd_scale = self.current_kd_scale
-        step_count = 0
-        print_interval = int(self.control_freq)  # 每秒打印一次
-        
-        # 目标位置固定为全零
+        print(f"缓关闭 ({RAMP_DOWN_TIME}s)...")
+        start = time.time()
+        init_kp, init_kd = self.current_kp_scale, self.current_kd_scale
         target_pos = np.zeros(self.num_actions, dtype=np.float32)
         
         while True:
-            elapsed = time.time() - start_time
+            elapsed = time.time() - start
             if elapsed >= RAMP_DOWN_TIME:
-                self.current_kp_scale = 0.0
-                self.current_kd_scale = 0.0
+                self.current_kp_scale = self.current_kd_scale = 0.0
                 break
             
-            # 线性插值降低
             progress = elapsed / RAMP_DOWN_TIME
-            self.current_kp_scale = initial_kp_scale * (1.0 - progress)
-            self.current_kd_scale = initial_kd_scale * (1.0 - progress)
+            self.current_kp_scale = init_kp * (1.0 - progress)
+            self.current_kd_scale = init_kd * (1.0 - progress)
             
-            # 获取当前位置
-            dof_pos, _, _, _ = self.get_robot_state()
-            # 发送固定的零位置目标
-            self.send_mit_command(target_pos, self.current_kp_scale, self.current_kd_scale)
+            self.get_robot_state()
+            mit_data = self.send_mit_command(target_pos, self.current_kp_scale, self.current_kd_scale)
             
-            # 每隔一定次数打印表格
-            step_count += 1
-            if step_count >= print_interval:
-                step_count = 0
-                self._print_ramp_table(dof_pos, target_pos, 
-                                      self.current_kp_scale, self.current_kd_scale, 
-                                      phase=f"Ramp Down ({elapsed:.1f}s/{RAMP_DOWN_TIME}s)")
+            self.print_counter += 1
+            if self.print_counter >= self.print_interval:
+                self.print_counter = 0
+                self._print_table(mit_data, f"Ramp Down {elapsed:.1f}s/{RAMP_DOWN_TIME}s")
             
             time.sleep(self.control_dt)
         
-        # 最后发送零位置、零力矩
         self.send_mit_command(target_pos, 0.0, 0.0)
-        print(f"\n✓ 缓关闭完成")
-    
-    def _print_mit_table(self, mit_data):
-        """用rich表格打印MIT数据"""
-        # 计算频率（基于调用间隔）
-        def calc_freq(timestamps):
-            if len(timestamps) < 2:
-                return 0.0
-            intervals = np.diff(list(timestamps))
-            return 1.0 / np.mean(intervals) if len(intervals) > 0 and np.mean(intervals) > 0 else 0.0
-        
-        get_freq = calc_freq(self.get_state_timestamps)
-        mit_freq = calc_freq(self.control_mit_timestamps)
-        loop_freq = calc_freq(self.loop_timestamps)
-        target_freq = 1.0 / self.target_dt
-        
-        table = Table(title=f"MIT Control Data | Loop: {loop_freq:.1f}/{target_freq:.0f}Hz | Get: {get_freq:.1f}Hz | Send: {mit_freq:.1f}Hz")
-        table.add_column("Policy ID", style="cyan", justify="center")
-        table.add_column("SDK ID", style="magenta", justify="center")
-        table.add_column("Name", style="green")
-        table.add_column("Position", style="yellow", justify="right")
-        table.add_column("KP", style="blue", justify="right")
-        table.add_column("KD", style="blue", justify="right")
-        table.add_column("Tau", style="red", justify="right")
-        
-        for policy_idx in range(self.num_actions):
-            sdk_jid = POLICY_TO_SDK_JOINT_MAP[policy_idx]
-            data = mit_data[sdk_jid]
-            table.add_row(
-                str(policy_idx),
-                str(sdk_jid),
-                JOINT_NAMES.get(policy_idx, "unknown"),
-                f"{data['q']:.4f}",
-                f"{data['kp']:.2f}",
-                f"{data['kd']:.2f}",
-                f"{data['tau']:.2f}"
-            )
-        
-        self.console.clear()
-        self.console.print(table)
+        print("✓ 缓关闭完成")
     
     def signal_handler(self, signum, frame):
-        """处理Ctrl+C信号"""
-        print("\n\n收到退出信号 (Ctrl+C)...")
+        print("\n收到退出信号...")
         self.shutdown_requested = True
     
     def run(self):
-        """主控制循环"""
-        # 注册信号处理
         signal.signal(signal.SIGINT, self.signal_handler)
         signal.signal(signal.SIGTERM, self.signal_handler)
         
         try:
-            # 连接机器人
             self.connect_robot()
-            
-            # 缓启动
             self.ramp_up()
-            
             self.running = True
-            print("开始主控制循环...")
-            print("按 Ctrl+C 安全退出")
-            
-            # 初始化CSV日志
             self.init_csv_logging()
+            print("开始主控制循环, Ctrl+C退出")
             
-            step_count = 0
-            next_loop_time = time.time()  # 下一次循环的目标时间
-            transition_start_time = time.time()  # 过渡期开始时间
+            transition_start = time.time()
+            next_loop_time = time.time()
             
-            # ========== 注释掉policy执行循环，只测试缓慢启动 ==========
             while self.running and not self.shutdown_requested:
-                loop_start = time.time()
-                
-                # 等待到目标时间点
-                sleep_time = next_loop_time - loop_start
+                sleep_time = next_loop_time - time.time()
                 if sleep_time > 0:
                     time.sleep(sleep_time)
                 
-                actual_start = time.time()
+                self.loop_timestamps.append(time.time())
                 
-                # 获取机器人状态
                 dof_pos, dof_vel, quat, ang_vel = self.get_robot_state()
-                
-                # 计算RPY
                 rpy = quatToEuler(quat)
                 
-                # 构建本体感知观测
-                obs_body_dof_vel = dof_vel.copy()
-                obs_body_dof_vel[self.ankle_idx] = 0.0
+                obs_dof_vel = dof_vel.copy()
+                obs_dof_vel[self.ankle_idx] = 0.0
                 
                 obs_proprio = np.concatenate([
                     ang_vel * self.ang_vel_scale,
-                    rpy[:2],  # roll, pitch
+                    rpy[:2],
                     (dof_pos - self.default_dof_pos) * self.dof_pos_scale,
-                    obs_body_dof_vel * self.dof_vel_scale,
+                    obs_dof_vel * self.dof_vel_scale,
                     self.last_action
                 ])
                 
-                # print("roll/pitch (rpy):", rpy[:2], "obs_proprio roll/pitch:", obs_proprio[3:5])
-                # 打印关节编号与位置，便于对应 policy idx -> SDK jid
-                # dof_with_idx = [f"{i}:{dof_pos[i]:.4f}" for i in range(self.num_actions)]
-                # print("dof_pos (policy_idx:value):", ", ".join(dof_with_idx))
-
-                # 发送状态到Redis (用于motion server)
+                # Redis通信
+                action_mimic = self.default_mimic_obs.copy()
+                mimic_obs_source = 0
                 if self.redis_client:
                     state_body = np.concatenate([ang_vel, rpy[:2], dof_pos])
                     self.redis_pipeline.set("state_body_taks_t1", json.dumps(state_body.tolist()))
-                    self.redis_pipeline.set("state_hand_left_taks_t1", json.dumps(np.zeros(7).tolist()))
-                    self.redis_pipeline.set("state_hand_right_taks_t1", json.dumps(np.zeros(7).tolist()))
-                    self.redis_pipeline.set("state_neck_taks_t1", json.dumps(np.zeros(2).tolist()))
-                    self.redis_pipeline.set("t_state", int(time.time() * 1000))
-                    self.redis_pipeline.execute()
-                
-                # 从Redis获取mimic观测
-                action_mimic = self.default_mimic_obs.copy()
-                action_neck = np.zeros(2, dtype=np.float32)
-                
-                if self.redis_client:
-                    keys = ["action_body_taks_t1", "action_neck_taks_t1"]
-                    for key in keys:
-                        self.redis_pipeline.get(key)
-                    redis_results = self.redis_pipeline.execute()
+                    self.redis_pipeline.get("action_body_taks_t1")
+                    self.redis_pipeline.get("action_neck_taks_t1")
+                    results = self.redis_pipeline.execute()
                     
-                    if redis_results[0] is not None:
-                        action_mimic = np.array(json.loads(redis_results[0]), dtype=np.float32)
-                    if redis_results[1] is not None:
-                        action_neck = np.array(json.loads(redis_results[1]), dtype=np.float32)
-                    
-                    # Handle G1 format (35 dims) -> Taks_T1 format (38 dims)
-                    if len(action_mimic) == 35:
-                        neck_joints = np.array([action_neck[0], 0.0, action_neck[1]], dtype=np.float32)
-                        action_mimic = np.concatenate([action_mimic, neck_joints])
+                    if results[1]:
+                        action_mimic = np.array(json.loads(results[1]), dtype=np.float32)
+                        mimic_obs_source = 1
+                        if self.body_smoother:
+                            action_mimic = self.body_smoother.smooth(action_mimic)
+                        if len(action_mimic) == 35 and results[2]:
+                            neck = np.array(json.loads(results[2]), dtype=np.float32)
+                            action_mimic = np.concatenate([action_mimic, [neck[0], 0.0, neck[1]]])
                 
-                # 构建完整观测
+                # 构建观测
                 obs_full = np.concatenate([action_mimic, obs_proprio])
-                
-                # 更新历史
                 obs_hist = np.array(self.proprio_history_buf).flatten()
                 self.proprio_history_buf.append(obs_full)
-                
-                future_obs = action_mimic.copy()
-                
-                # 组合所有观测
-                obs_buf = np.concatenate([obs_full, obs_hist, future_obs])
-                
-                assert obs_buf.shape[0] == self.total_obs_size, \
-                    f"Expected {self.total_obs_size} obs, got {obs_buf.shape[0]}"
+                obs_buf = np.concatenate([obs_full, obs_hist, action_mimic])
                 
                 # 运行policy
                 obs_tensor = torch.from_numpy(obs_buf).float().unsqueeze(0).to(self.device)
                 with torch.no_grad():
                     raw_action = self.policy(obs_tensor).cpu().numpy().squeeze()
                 
-                # # Measure and track policy execution FPS
-                # current_time = time.time()
-                # if self.last_policy_time is not None:
-                #     policy_interval = current_time - self.last_policy_time
-                    
-                #     # Track policy execution times
-                #     self.policy_execution_times.append(policy_interval)
-                #     self.policy_step_count += 1
-                    
-                #     # Print policy execution FPS every 100 steps
-                #     if self.policy_step_count % self.policy_fps_print_interval == 0:
-                #         recent_intervals = self.policy_execution_times[-self.policy_fps_print_interval:]
-                #         avg_interval = np.mean(recent_intervals)
-                #         avg_execution_fps = 1.0 / avg_interval
-                #         print(f"Policy Execution FPS (last {self.policy_fps_print_interval} steps): {avg_execution_fps:.2f} Hz (avg interval: {avg_interval*1000:.2f}ms)")
-                # self.last_policy_time = current_time
-                
                 self.last_action = raw_action.copy()
                 
                 # 计算目标位置
-                raw_action = np.clip(raw_action, -5.0, 5.0)
-                policy_target_pos = self.default_dof_pos + raw_action * self.action_scale
+                raw_action_clipped = np.clip(raw_action, -5.0, 5.0)
+                policy_target = self.default_dof_pos + raw_action_clipped * self.action_scale
+                policy_target = np.clip(policy_target, JOINT_LIMITS_LOWER, JOINT_LIMITS_UPPER)
                 
-                # 应用关节物理限位
-                policy_target_pos = np.clip(policy_target_pos, JOINT_LIMITS_LOWER, JOINT_LIMITS_UPPER)
-                
-                # 平滑过渡：从零位平滑过渡到policy输出
-                transition_elapsed = time.time() - transition_start_time
-                if transition_elapsed < TRANSITION_TIME:
-                    # 使用smoothstep曲线进行平滑过渡
-                    t = transition_elapsed / TRANSITION_TIME
-                    blend_ratio = t * t * (3.0 - 2.0 * t)  # smoothstep: 3t² - 2t³
-                    zero_pos = np.zeros(self.num_actions, dtype=np.float32)
-                    target_dof_pos = (1.0 - blend_ratio) * zero_pos + blend_ratio * policy_target_pos
+                # 平滑过渡
+                trans_elapsed = time.time() - transition_start
+                if trans_elapsed < TRANSITION_TIME:
+                    t = trans_elapsed / TRANSITION_TIME
+                    blend = t * t * (3.0 - 2.0 * t)
+                    target_dof_pos = blend * policy_target
                 else:
-                    target_dof_pos = policy_target_pos
+                    blend = 1.0
+                    target_dof_pos = policy_target
                 
-                # Fall protection check
-                kp_scale = self.current_kp_scale
-                kd_scale = self.current_kd_scale
+                # 跌倒保护
+                kp_scale, kd_scale = self.current_kp_scale, self.current_kd_scale
                 if self.fall_protection_enabled and self.fall_controller:
                     kp_scale, kd_scale, is_fallen = self.fall_controller.check_and_protect_from_rpy(rpy[0], rpy[1])
                     if is_fallen:
-                        print("\n[FALL DETECTED] 检测到跌倒! 断开连接...")
-                        self.shutdown_requested = True
+                        print("\n[跌倒检测] 断开连接...")
                         break
                 
-                # 发送控制命令
+                # 发送命令
                 mit_data = self.send_mit_command(target_dof_pos, kp_scale, kd_scale)
                 
-                # 记录到CSV
-                self.log_to_csv(obs_proprio, mit_data)
+                # CSV日志
+                debug_data = {
+                    'mimic_obs_source': mimic_obs_source,
+                    'mimic_obs': action_mimic,
+                    'raw_action': raw_action,
+                    'policy_target': policy_target,
+                    'target_dof_pos': target_dof_pos,
+                    'blend_ratio': blend,
+                    'kp_scale': kp_scale,
+                    'kd_scale': kd_scale,
+                }
+                self.log_to_csv(obs_proprio, mit_data, debug_data)
                 
-                # 计算下一次循环的目标时间
-                next_loop_time += self.target_dt
+                self.print_counter += 1
+                if self.print_counter >= self.print_interval:
+                    self.print_counter = 0
+                    self._print_table(mit_data, "Running")
                 
-                # 记录实际循环时间
-                actual_loop_time = time.time() - actual_start
-                self.loop_times.append(actual_loop_time)
-                
-                step_count += 1
-                
-                # 检测是否超时
-                if actual_loop_time > self.target_dt:
-                    # 如果超时，重新同步时间
-                    next_loop_time = time.time() + self.target_dt
-            
-            print("\n缓启动测试完成，等待Ctrl+C退出...")
-            while not self.shutdown_requested:
-                time.sleep(0.1)
+                next_loop_time += self.control_dt
+                if time.time() > next_loop_time:
+                    next_loop_time = time.time() + self.control_dt
                     
         except Exception as e:
-            print(f"\n错误: {e}")
+            print(f"错误: {e}")
             import traceback
             traceback.print_exc()
         finally:
-            # ========== 注释掉缓关闭，只测试缓慢启动 ==========
-            # 缓关闭
             self.running = False
-            self.ramp_down()
-            
-            # 关闭CSV日志
             self.close_csv_logging()
-            
-            # 断开连接
+            self.ramp_down()
             self.disconnect_robot()
             print("控制器已退出")
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Taks-T1 Sim2Real 部署')
-    parser.add_argument('--policy', type=str, required=True,
-                        help='ONNX policy文件路径')
-    parser.add_argument('--device', type=str, default='cuda',
-                        help='运行设备 (cuda/cpu)')
-    parser.add_argument('--server_ip', type=str, default='192.168.36.36',
-                        help='Taks-T1服务器IP')
-    parser.add_argument('--cmd_port', type=int, default=5555,
-                        help='命令端口')
-    parser.add_argument('--fall_protection', action='store_true', default=True,
-                        help='Enable fall protection')
-    parser.add_argument('--no_fall_protection', action='store_true',
-                        help='Disable fall protection')
-    parser.add_argument('--fall_roll_threshold', type=float, default=1.0,
-                        help='Fall detection roll threshold in radians (default: 1.0 rad = 57 deg)')
-    parser.add_argument('--fall_pitch_threshold', type=float, default=1.0,
-                        help='Fall detection pitch threshold in radians (default: 1.0 rad = 57 deg)')
-    
+    parser = argparse.ArgumentParser(description='Taks-T1 Sim2Real 部署 (带CSV日志)')
+    parser.add_argument('--policy', type=str, required=True, help='ONNX policy路径')
+    parser.add_argument('--device', type=str, default='cuda')
+    parser.add_argument('--server_ip', type=str, default='192.168.36.36')
+    parser.add_argument('--cmd_port', type=int, default=5555)
+    parser.add_argument('--smooth_body', type=float, default=0.0, help='EMA平滑系数 (0=关闭)')
+    parser.add_argument('--no_fall_protection', action='store_true')
+    parser.add_argument('--fall_roll_threshold', type=float, default=1.0)
+    parser.add_argument('--fall_pitch_threshold', type=float, default=1.0)
     args = parser.parse_args()
     
-    # Handle fall protection flag
-    fall_protection = not args.no_fall_protection
-    
-    # 验证文件存在
     if not os.path.exists(args.policy):
-        print(f"错误: Policy文件不存在: {args.policy}")
+        print(f"错误: Policy不存在: {args.policy}")
         return
     
     print("=" * 50)
-    print("Taks-T1 Sim2Real 部署")
+    print("Taks-T1 Sim2Real 部署 (重构版 + CSV日志)")
     print("=" * 50)
+    print(f"  训练配置: sim_dt={SIM_DT}, decimation={DECIMATION}, 控制dt={CONTROL_DT}s ({CONTROL_FREQ:.0f}Hz)")
+    print(f"  控制模式: 位置控制 (MIT: kp/kd有值, q有值, dq=0, tau=0)")
     print(f"  Policy: {args.policy}")
-    print(f"  Device: {args.device}")
     print(f"  Server: {args.server_ip}:{args.cmd_port}")
-    print(f"  缓启动时间: {RAMP_UP_TIME}s")
-    print(f"  缓关闭时间: {RAMP_DOWN_TIME}s")
-    print(f"  Fall protection: {fall_protection}")
-    if fall_protection:
-        print(f"  Fall roll threshold: {np.degrees(args.fall_roll_threshold):.1f} deg")
-        print(f"  Fall pitch threshold: {np.degrees(args.fall_pitch_threshold):.1f} deg")
+    print(f"  EMA平滑: {args.smooth_body if args.smooth_body > 0 else '关闭'}")
+    print(f"  跌倒保护: {'关闭' if args.no_fall_protection else '开启'}")
     print("=" * 50)
-    
-    print("\n安全警告:")
-    print("  - 确保机器人处于安全环境")
-    print("  - 随时准备按 Ctrl+C 安全退出")
-    print("=" * 50 + "\n")
     
     controller = TaksT1RealController(
         policy_path=args.policy,
         device=args.device,
         server_ip=args.server_ip,
         cmd_port=args.cmd_port,
-        fall_protection=fall_protection,
+        smooth_body=args.smooth_body,
+        fall_protection=not args.no_fall_protection,
         fall_roll_threshold=args.fall_roll_threshold,
         fall_pitch_threshold=args.fall_pitch_threshold
     )
-    
     controller.run()
 
 
