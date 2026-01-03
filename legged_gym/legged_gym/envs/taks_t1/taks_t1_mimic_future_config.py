@@ -199,7 +199,7 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             turning_smoothness = -0.01  # Set to None to disable
             
             # 身体重心稳定奖励 - 防止被推时身体晃动过大
-            com_stability = -0.5  # CoM水平偏移惩罚
+            com_stability = -1.0  # CoM水平偏移惩罚
             com_velocity = -0.1  # CoM水平速度惩罚
 
 
