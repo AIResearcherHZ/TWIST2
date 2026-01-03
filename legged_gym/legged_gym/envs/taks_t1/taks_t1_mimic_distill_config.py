@@ -54,7 +54,7 @@ class TaksT1MimicPrivCfg(HumanoidMimicCfg):
                      1.0, 1.0, 1.0,  # waist
                      1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,  # Left Arm
                      1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,  # Right Arm
-                     0.5, 0.5, 0.2,  # Neck - 降低颈部权重防止仰头
+                     0.5, 0.5, 0.5,  # Neck - 降低颈部权重防止仰头
                      ]
         
         global_obs = False
@@ -196,11 +196,6 @@ class TaksT1MimicPrivCfg(HumanoidMimicCfg):
             ang_vel_xy = -0.01
             ankle_dof_acc = -1e-7 * 2
             ankle_dof_vel = -1e-4 * 2
-                        
-            # 未来动作一致性奖励（只在训练时生效）- Set to None to disable
-            future_action_consistency = 1.0  # Set to None to disable
-            future_yaw_consistency = 0.1  # Set to None to disable
-            turning_smoothness = -0.05  # Set to None to disable
 
         min_dist = 0.1
         max_dist = 0.4
@@ -258,31 +253,6 @@ class TaksT1MimicPrivCfg(HumanoidMimicCfg):
 
         action_delay = (True and domain_rand_general)
         action_buf_len = 8
-        
-        # ==================== 新增鲁棒性随机化 ====================
-        # 观测丢包 - 模拟传感器偶发失效
-        observation_dropout = (True and domain_rand_general)
-        observation_dropout_prob = 0.001  # 每个维度丢包概率 0.1%
-        observation_dropout_mode = 'hold'  # 丢包时保持上一帧值 ('hold' or 'zero')
-        
-        # 关节故障 - 模拟电机故障（极低概率）
-        joint_failure = (False and domain_rand_general)  # 默认关闭，太激进
-        joint_failure_prob = 0.0001  # 每个关节失效概率 0.01%
-        joint_failure_mode = 'weak'  # 弱化模式（扭矩衰减）
-        joint_failure_weak_factor = 0.5  # 衰减因子
-        
-        # 传感器延迟尖峰 - 模拟偶发的通讯阻塞
-        sensor_latency_spike = (True and domain_rand_general)
-        sensor_latency_spike_prob = 0.001  # 0.1%概率发生延迟尖峰
-        sensor_latency_max_steps = 10  # 最大延迟10步
-        
-        # 惯量随机化 - 模拟电机转子惯量不确定性
-        randomize_armature = (True and domain_rand_general)
-        armature_range = [0.5, 2.0]  # 惯量缩放范围
-        
-        # 刚体惯性随机化 - 模拟连杆惯性不确定性
-        randomize_link_inertia = (True and domain_rand_general)
-        link_inertia_range = [0.5, 2.0]  # 刚体惯性缩放范围
     
     class noise(HumanoidMimicCfg.noise):
         add_noise = True

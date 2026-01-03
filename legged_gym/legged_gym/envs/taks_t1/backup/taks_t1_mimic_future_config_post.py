@@ -50,7 +50,7 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             force_scale_min = 0.0
             apply_force_x_range = [-40.0, 40.0]
             apply_force_y_range = [-40.0, 40.0]
-            apply_force_z_range = [-50.0, 5.0]
+            apply_force_z_range = [-50.0, 10.0]
             zero_force_prob = [0.25, 0.25, 0.25]
             randomize_force_duration = [10, 50]
             max_force_estimation = True
@@ -96,7 +96,7 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
 
         push_robots = (True and domain_rand_general)
         push_interval_s = 4
-        max_push_vel_xy = 1.0
+        max_push_vel_xy = 2.0   # 原值1.0
 
         push_end_effector = (False and domain_rand_general)
         push_end_effector_interval_s = 2
@@ -131,44 +131,76 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
         # 刚体惯性随机化 - 模拟连杆惯性不确定性
         randomize_link_inertia = (True and domain_rand_general)
         link_inertia_range = [0.5, 2.0]  # 刚体惯性缩放范围
+        
+        # 通信延迟随机化 - 模拟真实硬件通信不同步
+        comm_delay = (True and domain_rand_general)
+        comm_delay_buf_len = 10  # 延迟buffer长度(步数)
+        # 电机位置/速度/扭矩各自的延迟范围(步数)
+        motor_pos_delay_range = [0, 4]
+        motor_vel_delay_range = [0, 4]
+        motor_torque_delay_range = [0, 4]
+        # IMU与电机的相对延迟范围(步数，正值表示IMU比电机慢)
+        imu_motor_delay_range = [-6, 6]
+        # 每个episode是否重新采样延迟
+        resample_delay_per_episode = True
 
     class rewards(TaksT1MimicPrivCfg.rewards):
         # All reward scales can be set to None to completely disable that reward
         # Set any scale to None to skip computing that reward entirely
+        
+        # ==================== 踉跄控制参数 ====================
+        # 收紧termination条件以减少踉跄时间
+        # 原值4.0太宽松(约229°)，收紧到1.57(约90°)可更快终止踉跄状态
+        termination_roll = 1.57   # 原值4.0，收紧以更快检测踉跄
+        termination_pitch = 1.57  # 原值4.0，收紧以更快检测踉跄
+        # 高度差阈值：原值0.3m，收紧到0.25m，以更快检测失衡
+        root_height_diff_threshold = 0.25  # 原值0.3，收紧到0.25m
+        
         class scales:
-            tracking_joint_dof = 2.22  # Set to None to disable
-            tracking_joint_vel = 0.222  # Set to None to disable
-            tracking_root_translation_z = 1.22  # Set to None to disable
-            tracking_root_rotation = 1.22  # Set to None to disable
-            tracking_root_linear_vel = 1.22  # Set to None to disable
-            tracking_root_angular_vel = 1.22  # Set to None to disable
-            tracking_keybody_pos = 2.22  # Set to None to disable
-            tracking_keybody_pos_global = 2.22  # Set to None to disable
-            alive = 0.522  # Set to None to disable
-            feet_slip = -0.122  # Set to None to disable
+            tracking_joint_dof = 2.0  # Set to None to disable
+            tracking_joint_vel = 0.2  # Set to None to disable
+            tracking_root_translation_z = 1.0  # Set to None to disable
+            tracking_root_rotation = 1.0  # Set to None to disable
+            tracking_root_linear_vel = 1.0  # Set to None to disable
+            tracking_root_angular_vel = 1.0  # Set to None to disable
+            tracking_keybody_pos = 2.0  # Set to None to disable
+            tracking_keybody_pos_global = 2.0  # Set to None to disable
+            alive = 0.5  # Set to None to disable
+            feet_slip = -0.1  # Set to None to disable
             feet_contact_forces = -5e-4  # Set to None to disable
-            feet_stumble = -1.25  # Set to None to disable
+            feet_stumble = -2.0  # 增强踉跄惩罚(原值-1.25)
             dof_pos_limits = -5.0  # Set to None to disable
             dof_torque_limits = -1.0  # Set to None to disable
             dof_vel = -1e-4  # Set to None to disable
             dof_acc = -1e-7  # Set to None to disable
             action_rate = -0.1  # Set to None to disable
             feet_air_time = 5.0  # Set to None to disable
-            ang_vel_xy = -0.02  # Set to None to disable
-            ankle_dof_acc = -1e-7 * 2  # Set to None to disable
-            ankle_dof_vel = -1e-4 * 2  # Set to None to disable
+            ang_vel_xy = -0.05  # 增强角速度惩罚(原值-0.02)，抑制踉跄时的摇摆
+            ankle_dof_acc = -1e-7 * 2  # Set to None to disable(原来是*2)
+            ankle_dof_vel = -1e-4 * 2  # Set to None to disable(原来是*2)
             
             # 脚掌着地奖励和脚掌roll/pitch保持不动惩罚
             # feet_flat_contact = 2.0  # 脚掌全部着地奖励
-            # ankle_roll_pitch_penalty = -0.1 # 脚掌roll/pitch偏离惩罚
+            # ankle_roll_pitch_penalty = -0.05 # 脚掌roll/pitch偏离惩罚
             
             # 头部neck三关节保持不动惩罚
-            neck_dof_penalty = -0.25  # neck三关节偏离惩罚
+            neck_dof_penalty = -0.5  # neck三关节偏离惩罚
+            
+            # 骨盆加速度约束 - 鼓励平滑运动
+            pelvis_lin_acc = -5e-7  # 骨盆线性加速度惩罚
+            pelvis_ang_acc = -1e-7  # 骨盆角加速度惩罚
+            
+            # 姿态保持 - 保持躯干平坦
+            flat_orientation = -0.5  # roll/pitch偏离惩罚
 
             # 未来动作一致性奖励（只在训练时生效）- Set to None to disable
-            future_action_consistency = 1.5  # Set to None to disable
+            future_action_consistency = 1.0  # Set to None to disable
             future_yaw_consistency = 0.1  # Set to None to disable
-            turning_smoothness = -0.05  # Set to None to disable
+            turning_smoothness = -0.01  # Set to None to disable
+            
+            # 身体重心稳定奖励 - 防止被推时身体晃动过大
+            com_stability = -1.0  # CoM水平偏移惩罚
+            com_velocity = -0.1  # CoM水平速度惩罚
 
 
 class TaksT1MimicStuFutureCfgDAgger(TaksT1MimicStuFutureCfg):
