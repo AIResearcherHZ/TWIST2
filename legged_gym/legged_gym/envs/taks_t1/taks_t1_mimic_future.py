@@ -78,6 +78,12 @@ class TaksT1MimicFuture(TaksT1MimicDistill):
         else:
             print("Force curriculum disabled (enable_force_curriculum is None or False)")
 
+        # 通信延迟随机化初始化
+        _comm_delay = getattr(cfg.domain_rand, 'comm_delay', False)
+        self.enable_comm_delay = bool(_comm_delay) if _comm_delay is not None else False
+        if self.enable_comm_delay:
+            self._init_comm_delay_buffers(cfg)
+
     def _get_unified_motion_data(self):
         if (self.obs_type == 'student_future' and
                 hasattr(self, '_tar_motion_steps_future')):
@@ -260,6 +266,8 @@ class TaksT1MimicFuture(TaksT1MimicDistill):
         super().reset_idx(env_ids)
         if self.enable_force_curriculum:
             self._update_force_curriculum(env_ids)
+        if getattr(self, 'enable_comm_delay', False):
+            self._resample_comm_delay(env_ids)
 
     def _init_force_curriculum_components(self, cfg):
         force_cfg = cfg.env.force_curriculum
@@ -356,6 +364,105 @@ class TaksT1MimicFuture(TaksT1MimicDistill):
     def _apply_motion_domain_randomization(self, root_pos, root_rot, root_vel,
                                            root_ang_vel, dof_pos, dof_vel):
         return root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel
+
+    # ==================== 通信延迟随机化 ====================
+    def _init_comm_delay_buffers(self, cfg):
+        """初始化通信延迟随机化所需的buffer。"""
+        dr = cfg.domain_rand
+        self.comm_delay_buf_len = getattr(dr, 'comm_delay_buf_len', 10)
+        self.motor_pos_delay_range = getattr(dr, 'motor_pos_delay_range', [0, 3])
+        self.motor_vel_delay_range = getattr(dr, 'motor_vel_delay_range', [0, 4])
+        self.motor_torque_delay_range = getattr(dr, 'motor_torque_delay_range', [0, 3])
+        self.imu_motor_delay_range = getattr(dr, 'imu_motor_delay_range', [-2, 2])
+        self.resample_delay_per_episode = getattr(dr, 'resample_delay_per_episode', True)
+
+        # 历史buffer: [num_envs, buf_len, dim]
+        self.motor_pos_history = torch.zeros(
+            (self.num_envs, self.comm_delay_buf_len, self.num_dof),
+            device=self.device, dtype=torch.float)
+        self.motor_vel_history = torch.zeros(
+            (self.num_envs, self.comm_delay_buf_len, self.num_dof),
+            device=self.device, dtype=torch.float)
+        self.motor_torque_history = torch.zeros(
+            (self.num_envs, self.comm_delay_buf_len, self.num_dof),
+            device=self.device, dtype=torch.float)
+        # IMU: ang_vel(3) + roll(1) + pitch(1)
+        self.imu_history = torch.zeros(
+            (self.num_envs, self.comm_delay_buf_len, 5),
+            device=self.device, dtype=torch.float)
+
+        # 每个env的延迟步数 [num_envs]
+        self.motor_pos_delay = torch.zeros(self.num_envs, device=self.device, dtype=torch.long)
+        self.motor_vel_delay = torch.zeros(self.num_envs, device=self.device, dtype=torch.long)
+        self.motor_torque_delay = torch.zeros(self.num_envs, device=self.device, dtype=torch.long)
+        self.imu_delay = torch.zeros(self.num_envs, device=self.device, dtype=torch.long)
+
+        # 初始采样延迟
+        self._resample_comm_delay(torch.arange(self.num_envs, device=self.device))
+        print(f"Comm delay enabled: pos[{self.motor_pos_delay_range}], "
+              f"vel[{self.motor_vel_delay_range}], torque[{self.motor_torque_delay_range}], "
+              f"imu_offset[{self.imu_motor_delay_range}]")
+
+    def _resample_comm_delay(self, env_ids):
+        """为指定env重新采样通信延迟。"""
+        if not self.resample_delay_per_episode:
+            return
+        n = len(env_ids)
+        # 电机各通道独立延迟
+        self.motor_pos_delay[env_ids] = torch.randint(
+            self.motor_pos_delay_range[0], self.motor_pos_delay_range[1] + 1,
+            (n,), device=self.device, dtype=torch.long)
+        self.motor_vel_delay[env_ids] = torch.randint(
+            self.motor_vel_delay_range[0], self.motor_vel_delay_range[1] + 1,
+            (n,), device=self.device, dtype=torch.long)
+        self.motor_torque_delay[env_ids] = torch.randint(
+            self.motor_torque_delay_range[0], self.motor_torque_delay_range[1] + 1,
+            (n,), device=self.device, dtype=torch.long)
+        # IMU相对电机的延迟偏移
+        self.imu_delay[env_ids] = torch.randint(
+            self.imu_motor_delay_range[0], self.imu_motor_delay_range[1] + 1,
+            (n,), device=self.device, dtype=torch.long)
+        # 重置历史buffer
+        self.motor_pos_history[env_ids] = 0
+        self.motor_vel_history[env_ids] = 0
+        self.motor_torque_history[env_ids] = 0
+        self.imu_history[env_ids] = 0
+
+    def _update_comm_delay_buffers(self):
+        """更新通信延迟历史buffer，每步调用。"""
+        # 滚动buffer: 丢弃最老的，添加最新的
+        self.motor_pos_history = torch.roll(self.motor_pos_history, -1, dims=1)
+        self.motor_vel_history = torch.roll(self.motor_vel_history, -1, dims=1)
+        self.motor_torque_history = torch.roll(self.motor_torque_history, -1, dims=1)
+        self.imu_history = torch.roll(self.imu_history, -1, dims=1)
+        # 写入最新值
+        self.motor_pos_history[:, -1] = self.dof_pos
+        self.motor_vel_history[:, -1] = self.dof_vel
+        self.motor_torque_history[:, -1] = self.torques
+        self.imu_history[:, -1, :3] = self.base_ang_vel
+        self.imu_history[:, -1, 3] = self.roll
+        self.imu_history[:, -1, 4] = self.pitch
+
+    def _get_delayed_obs(self):
+        """获取带通信延迟的观测值。返回延迟后的dof_pos, dof_vel, torques, ang_vel, roll, pitch。
+        使用高效的gather操作实现per-env不同延迟。"""
+        buf_len = self.comm_delay_buf_len
+        env_idx = torch.arange(self.num_envs, device=self.device)
+
+        # 计算每个env的索引: buf_len - 1 - delay (最新是buf_len-1)
+        pos_idx = (buf_len - 1 - self.motor_pos_delay).clamp(0, buf_len - 1)
+        vel_idx = (buf_len - 1 - self.motor_vel_delay).clamp(0, buf_len - 1)
+        torque_idx = (buf_len - 1 - self.motor_torque_delay).clamp(0, buf_len - 1)
+        imu_idx = (buf_len - 1 - self.imu_delay).clamp(0, buf_len - 1)
+
+        # gather: [num_envs, buf_len, dim] -> [num_envs, dim]
+        delayed_pos = self.motor_pos_history[env_idx, pos_idx]
+        delayed_vel = self.motor_vel_history[env_idx, vel_idx]
+        delayed_torque = self.motor_torque_history[env_idx, torque_idx]
+        delayed_imu = self.imu_history[env_idx, imu_idx]
+
+        return (delayed_pos, delayed_vel, delayed_torque,
+                delayed_imu[:, :3], delayed_imu[:, 3], delayed_imu[:, 4])
 
     def pre_physics_step(self, actions):
         """Override pre_physics_step to include force updates."""
@@ -534,6 +641,10 @@ class TaksT1MimicFuture(TaksT1MimicDistill):
 
     def compute_observations(self):
         """Override to cache future motion data for reward computation."""
+        # 更新通信延迟buffer
+        if getattr(self, 'enable_comm_delay', False):
+            self._update_comm_delay_buffers()
+
         imu_obs = torch.stack((self.roll, self.pitch), dim=1)
         self.base_yaw_quat = quat_from_euler_xyz(
             0*self.yaw, 0*self.yaw, self.yaw)
@@ -548,13 +659,27 @@ class TaksT1MimicFuture(TaksT1MimicDistill):
             priv_mimic_obs, mimic_obs = self._get_mimic_obs()
             future_obs = None
 
+        # 根据是否启用通信延迟选择观测源
+        if getattr(self, 'enable_comm_delay', False):
+            (delayed_pos, delayed_vel, _, delayed_ang_vel,
+             delayed_roll, delayed_pitch) = self._get_delayed_obs()
+            obs_dof_pos = delayed_pos
+            obs_dof_vel = delayed_vel
+            obs_ang_vel = delayed_ang_vel
+            obs_imu = torch.stack((delayed_roll, delayed_pitch), dim=1)
+        else:
+            obs_dof_pos = self.dof_pos
+            obs_dof_vel = self.dof_vel
+            obs_ang_vel = self.base_ang_vel
+            obs_imu = imu_obs
+
         proprio_obs_buf = torch.cat((
-            self.base_ang_vel * self.obs_scales.ang_vel,
-            imu_obs,
+            obs_ang_vel * self.obs_scales.ang_vel,
+            obs_imu,
             self.reindex(
-                (self.dof_pos - self.default_dof_pos_all) *
+                (obs_dof_pos - self.default_dof_pos_all) *
                 self.obs_scales.dof_pos),
-            self.reindex(self.dof_vel * self.obs_scales.dof_vel),
+            self.reindex(obs_dof_vel * self.obs_scales.dof_vel),
             self.reindex(self.action_history_buf[:, -1]),
         ), dim=-1)
 
@@ -700,3 +825,20 @@ class TaksT1MimicFuture(TaksT1MimicDistill):
         """Penalize non-flat base orientation (roll and pitch).
         Uses projected_gravity which is already computed for GPU efficiency."""
         return torch.sum(torch.square(self.projected_gravity[:, :2]), dim=1)
+
+    def _reward_com_stability(self):
+        """惩罚CoM水平方向偏移，防止被推时身体晃动过大。
+        使用base相对于支撑脚的水平位置偏移。"""
+        # 计算双脚中心位置
+        feet_pos = self.rigid_body_states[:, self.feet_indices, :2]  # [N, 2, 2]
+        feet_center = feet_pos.mean(dim=1)  # [N, 2]
+        # base水平位置
+        base_xy = self.root_states[:, :2]  # [N, 2]
+        # 水平偏移
+        com_offset = base_xy - feet_center
+        return torch.sum(torch.square(com_offset), dim=1)
+
+    def _reward_com_velocity(self):
+        """惩罚CoM水平速度过大，鼓励平稳移动。"""
+        com_vel_xy = self.root_states[:, 7:9]  # [N, 2] 水平速度
+        return torch.sum(torch.square(com_vel_xy), dim=1)

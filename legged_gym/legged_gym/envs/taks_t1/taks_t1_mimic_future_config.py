@@ -131,6 +131,18 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
         # 刚体惯性随机化 - 模拟连杆惯性不确定性
         randomize_link_inertia = (True and domain_rand_general)
         link_inertia_range = [0.5, 2.0]  # 刚体惯性缩放范围
+        
+        # 通信延迟随机化 - 模拟真实硬件通信不同步
+        comm_delay = (True and domain_rand_general)
+        comm_delay_buf_len = 10  # 延迟buffer长度(步数)
+        # 电机位置/速度/扭矩各自的延迟范围(步数)
+        motor_pos_delay_range = [0, 4]
+        motor_vel_delay_range = [0, 4]
+        motor_torque_delay_range = [0, 4]
+        # IMU与电机的相对延迟范围(步数，正值表示IMU比电机慢)
+        imu_motor_delay_range = [-6, 6]
+        # 每个episode是否重新采样延迟
+        resample_delay_per_episode = True
 
     class rewards(TaksT1MimicPrivCfg.rewards):
         # All reward scales can be set to None to completely disable that reward
@@ -185,6 +197,10 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             future_action_consistency = 1.0  # Set to None to disable
             future_yaw_consistency = 0.1  # Set to None to disable
             turning_smoothness = -0.01  # Set to None to disable
+            
+            # 身体重心稳定奖励 - 防止被推时身体晃动过大
+            com_stability = -0.5  # CoM水平偏移惩罚
+            com_velocity = -0.1  # CoM水平速度惩罚
 
 
 class TaksT1MimicStuFutureCfgDAgger(TaksT1MimicStuFutureCfg):
