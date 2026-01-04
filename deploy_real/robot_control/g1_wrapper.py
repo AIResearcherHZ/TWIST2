@@ -148,8 +148,6 @@ class G1RealWorldEnv:
         self.send_cmd(cmd)
         return
         
-
-
     def close(self):
         exit()
 
