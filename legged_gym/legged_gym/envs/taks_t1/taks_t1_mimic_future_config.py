@@ -144,6 +144,11 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
         # 每个episode是否重新采样延迟
         resample_delay_per_episode = True
 
+        # PD增益随机化 - 模拟关节刚度和阻尼不确定性
+        randomize_pd_gain = (True and domain_rand_general)
+        stiffness_range = [0.5, 1.5]  # stiffness缩放范围
+        damping_range = [0.5, 5.0]    # damping缩放范围
+
     class rewards(TaksT1MimicPrivCfg.rewards):
         # All reward scales can be set to None to completely disable that reward
         # Set any scale to None to skip computing that reward entirely

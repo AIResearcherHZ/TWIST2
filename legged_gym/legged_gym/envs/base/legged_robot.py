@@ -252,6 +252,14 @@ class LeggedRobot(BaseTask):
         self.contact_buf[env_ids, :, :] = 0.
         self.action_history_buf[env_ids, :, :] = 0.
         self.reach_goal_timer[env_ids] = 0
+        
+        # 重新采样PD增益随机化
+        if self.randomize_pd_gain:
+            stiff_rng = getattr(self.cfg.domain_rand, 'stiffness_range', [0.8, 1.2])
+            damp_rng = getattr(self.cfg.domain_rand, 'damping_range', [0.8, 1.2])
+            n = len(env_ids)
+            self.stiffness_scale[env_ids] = (stiff_rng[1] - stiff_rng[0]) * torch.rand(n, self.num_dof, dtype=torch.float, device=self.device) + stiff_rng[0]
+            self.damping_scale[env_ids] = (damp_rng[1] - damp_rng[0]) * torch.rand(n, self.num_dof, dtype=torch.float, device=self.device) + damp_rng[0]
 
         # fill extras
         self.extras["episode"] = {}
@@ -516,10 +524,13 @@ class LeggedRobot(BaseTask):
         # actions_scaled[:, 11:] = 0.0
         control_type = self.cfg.control.control_type
         if control_type=="P":
-            if not self.cfg.domain_rand.randomize_motor:  # TODO add strength to gain directly
-                torques = self.p_gains*(actions_scaled + self.default_dof_pos_all - self.dof_pos) - self.d_gains*self.dof_vel
+            # 应用stiffness和damping随机化缩放
+            effective_p_gains = self.p_gains * self.stiffness_scale
+            effective_d_gains = self.d_gains * self.damping_scale
+            if not self.cfg.domain_rand.randomize_motor:
+                torques = effective_p_gains*(actions_scaled + self.default_dof_pos_all - self.dof_pos) - effective_d_gains*self.dof_vel
             else:
-                torques = self.motor_strength[0] * self.p_gains*(actions_scaled + self.default_dof_pos_all - self.dof_pos) - self.motor_strength[1] * self.d_gains*self.dof_vel
+                torques = self.motor_strength[0] * effective_p_gains*(actions_scaled + self.default_dof_pos_all - self.dof_pos) - self.motor_strength[1] * effective_d_gains*self.dof_vel
                 
         elif control_type=="V":
             torques = self.p_gains*(actions_scaled - self.dof_vel) - self.d_gains*(self.dof_vel - self.last_dof_vel)/self.sim_params.dt
@@ -681,6 +692,19 @@ class LeggedRobot(BaseTask):
 
         str_rng = self.cfg.domain_rand.motor_strength_range
         self.motor_strength = (str_rng[1] - str_rng[0]) * torch.rand(2, self.num_envs, self.num_dof, dtype=torch.float, device=self.device, requires_grad=False) + str_rng[0]
+        
+        # PD增益随机化
+        _randomize_pd = getattr(self.cfg.domain_rand, 'randomize_pd_gain', False)
+        self.randomize_pd_gain = bool(_randomize_pd) if _randomize_pd is not None else False
+        if self.randomize_pd_gain:
+            stiff_rng = getattr(self.cfg.domain_rand, 'stiffness_range', [0.8, 1.2])
+            damp_rng = getattr(self.cfg.domain_rand, 'damping_range', [0.8, 1.2])
+            self.stiffness_scale = (stiff_rng[1] - stiff_rng[0]) * torch.rand(self.num_envs, self.num_dof, dtype=torch.float, device=self.device, requires_grad=False) + stiff_rng[0]
+            self.damping_scale = (damp_rng[1] - damp_rng[0]) * torch.rand(self.num_envs, self.num_dof, dtype=torch.float, device=self.device, requires_grad=False) + damp_rng[0]
+        else:
+            self.stiffness_scale = torch.ones(self.num_envs, self.num_dof, dtype=torch.float, device=self.device, requires_grad=False)
+            self.damping_scale = torch.ones(self.num_envs, self.num_dof, dtype=torch.float, device=self.device, requires_grad=False)
+        
         if self.cfg.env.history_encoding:
             self.obs_history_buf = torch.zeros(self.num_envs, self.cfg.env.history_len, self.cfg.env.n_proprio, device=self.device, dtype=torch.float)
         self.action_history_buf = torch.zeros(self.num_envs, self.cfg.domain_rand.action_buf_len, self.num_actions, device=self.device, dtype=torch.float)
