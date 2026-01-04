@@ -149,6 +149,16 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
         stiffness_range = [0.5, 1.5]  # stiffness缩放范围
         damping_range = [0.5, 5.0]    # damping缩放范围
 
+    class noise(TaksT1MimicPrivCfg.noise):
+        add_noise = True
+        noise_increasing_steps = 50_000
+        
+        class noise_scales:
+            ang_vel = 0.2   # rad/s, 角速度噪声
+            imu = 0.2       # rad, roll/pitch噪声
+            dof_pos = 0.05  # rad, 电机位置噪声
+            dof_vel = 2.0   # rad/s, 电机速度噪声
+
     class rewards(TaksT1MimicPrivCfg.rewards):
         # All reward scales can be set to None to completely disable that reward
         # Set any scale to None to skip computing that reward entirely
