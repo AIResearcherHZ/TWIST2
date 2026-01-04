@@ -94,7 +94,7 @@
           <body name="left_hip_yaw_link" pos="0.00829 0.0 -0.1094">
             <inertial pos="-0.040 0.0 -0.105" mass="1.822"
               diaginertia="0.00886707 0.00953513 0.00370473" />
-            <joint name="left_hip_yaw_joint" pos="0 0 0" axis="0 0 -1" range="-2.7576 2.7576"
+            <joint name="left_hip_yaw_joint" pos="0 0 0" axis="0 0 1" range="-2.7576 2.7576"
               actuatorfrcrange="-97 97" class="leg_motor" />
             <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1.0 1.0 1.0 1"
               mesh="left_hip_yaw_link" />
@@ -103,7 +103,7 @@
             <body name="left_knee_link" pos="-0.0484 0.0 -0.1665" quat="0.996195 0 0.0871557 0">
               <inertial pos="0.005 0.0 -0.1568" mass="1.138"
                 diaginertia="0.00519687 0.00519687 0.00121387" />
-              <joint name="left_knee_joint" pos="0 0 0" axis="0 -1 0" range="-0.087267 2.8798"
+              <joint name="left_knee_joint" pos="0 0 0" axis="0 1 0" range="-0.087267 2.8798"
                 actuatorfrcrange="-120 120" class="leg_motor" />
               <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1.0 1.0 1.0 1"
                 mesh="left_knee_link" />
@@ -140,7 +140,7 @@
       <body name="right_hip_pitch_link" pos="0.0 -0.0913 -0.08747">
         <inertial pos="0.0 -0.0383 -0.0209" quat="0.954862 -0.293964 0.0302556 -0.030122" mass="0.91"
           diaginertia="0.00103133 0.00103133 0.000546" />
-        <joint name="right_hip_pitch_joint" pos="0 0 0" axis="0 -1 0" range="-2.5307 2.8798"
+        <joint name="right_hip_pitch_joint" pos="0 0 0" axis="0 1 0" range="-2.5307 2.8798"
           actuatorfrcrange="-120 120" class="leg_motor" />
         <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1.0 1.0 1.0 1"
           mesh="right_hip_pitch_link" />
@@ -158,7 +158,7 @@
           <body name="right_hip_yaw_link" pos="0.00829 0.0 -0.1094">
             <inertial pos="-0.04 0.0 -0.105" mass="1.822"
               diaginertia="0.00886707 0.00953513 0.00370473" />
-            <joint name="right_hip_yaw_joint" pos="0 0 0" axis="0 0 -1" range="-2.7576 2.7576"
+            <joint name="right_hip_yaw_joint" pos="0 0 0" axis="0 0 1" range="-2.7576 2.7576"
               actuatorfrcrange="-97 97" class="leg_motor" />
             <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1.0 1.0 1.0 1"
               mesh="right_hip_yaw_link" />
@@ -167,7 +167,7 @@
             <body name="right_knee_link" pos="-0.0484 -0.0005 -0.1665" quat="0.996195 0 0.0871557 0">
               <inertial pos="0.005 0.0 -0.1568" mass="1.138"
                 diaginertia="0.00519687 0.00519687 0.00121387" />
-              <joint name="right_knee_joint" pos="0 0 0" axis="0 -1 0" range="-0.087267 2.8798"
+              <joint name="right_knee_joint" pos="0 0 0" axis="0 1 0" range="-0.087267 2.8798"
                 actuatorfrcrange="-120 120" class="leg_motor" />
               <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1.0 1.0 1.0 1"
                 mesh="right_knee_link" />
@@ -176,7 +176,7 @@
               <body name="right_ankle_pitch_link" pos="0.0 -0.0222 -0.2985">
                 <inertial pos="0.0 0.028 0.0" mass="0.23"
                   diaginertia="0.000139917 3.45e-05 0.000139917" />
-                <joint name="right_ankle_pitch_joint" pos="0 0 0" axis="0 -1 0"
+                <joint name="right_ankle_pitch_joint" pos="0 0 0" axis="0 1 0"
                   range="-0.87267 0.5236" actuatorfrcrange="-27 27" class="ankle_motor" />
                 <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1.0 1.0 1.0 1"
                   mesh="right_ankle_pitch_link" />
