@@ -1,163 +1,247 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Taks SDK 客户端
+Taks SDK 客户端 - Zenoh Pub/Sub版本
+使用Zenoh订阅服务端发布的状态，实现低延迟通信
 """
 
-import zmq
-import json
+import zenoh
 import threading
 import time
-from typing import Dict, Optional, Callable
+import pyarrow as pa
+from typing import Dict, Optional, Tuple
+from threading import Lock
+
+# CUDA检测
+HAS_CUDA = False
+_cuda_ctx = None
+try:
+    import pyarrow.cuda as pa_cuda
+    num_devices = pa_cuda.Context.get_num_devices()
+    if num_devices > 0:
+        HAS_CUDA = True
+        _cuda_ctx = pa_cuda.Context(0)
+        print(f"✓ PyArrow CUDA加速已启用 (设备数: {num_devices})")
+    else:
+        print("✓ PyArrow CPU模式 (无CUDA设备)")
+except ImportError:
+    print("✓ PyArrow CPU模式 (小消息场景下性能已优化，无需CUDA)")
+except Exception as e:
+    print(f"✓ PyArrow CPU模式 (CUDA不可用: {type(e).__name__})")
+
+
+def _serialize_msg(msg: dict) -> bytes:
+    """序列化消息为Arrow IPC格式"""
+    if not msg:
+        return b""
+    arrays = []
+    names = list(msg.keys())
+    for k in names:
+        v = msg[k]
+        if isinstance(v, dict):
+            arrays.append(pa.array([str(v)]))
+        elif isinstance(v, list):
+            arrays.append(pa.array([str(v)]))
+        else:
+            arrays.append(pa.array([str(v)]))
+    batch = pa.record_batch(arrays, names=names)
+    sink = pa.BufferOutputStream()
+    writer = pa.ipc.new_stream(sink, batch.schema)
+    writer.write_batch(batch)
+    writer.close()
+    return sink.getvalue().to_pybytes()
+
+
+def _deserialize_msg(data: bytes) -> dict:
+    """反序列化Arrow IPC格式为消息"""
+    reader = pa.ipc.open_stream(pa.py_buffer(data))
+    batch = reader.read_next_batch()
+    msg = {}
+    for i, name in enumerate(batch.schema.names):
+        val = batch.column(i)[0].as_py()
+        if val is None:
+            msg[name] = None
+            continue
+        if not isinstance(val, str):
+            msg[name] = val
+            continue
+        # 尝试还原dict/list
+        if val.startswith('{') or val.startswith('['):
+            try:
+                import ast
+                msg[name] = ast.literal_eval(val)
+            except:
+                msg[name] = val
+        elif val == 'True':
+            msg[name] = True
+        elif val == 'False':
+            msg[name] = False
+        elif val.isdigit():
+            msg[name] = int(val)
+        else:
+            try:
+                msg[name] = float(val)
+            except:
+                msg[name] = val
+    return msg
 
 # ============ 全局状态 ============
-_ctx: Optional[zmq.Context] = None
-_dealer: Optional[zmq.Socket] = None
-_address: Optional[str] = None
+_session: Optional[zenoh.Session] = None
+_server_locator: Optional[str] = None
 _lock = threading.Lock()
 
-# 缓存
-_motor_cache: Dict[str, Dict] = {}
-_imu_cache: Dict[str, Dict] = {}
+# 订阅者
+_sub_motor = None
+_sub_imu = None
 
-# 配置
-RECV_TIMEOUT_MS = 50  # 接收超时(ms)，放宽以减少误报
-SEND_TIMEOUT_MS = 20  # 发送超时(ms)
-HWM = 200  # 高水位标记
+# 状态缓存（由订阅回调更新）
+_motor_state: Dict[int, Dict] = {}
+_motor_ts: float = 0
+_imu_state: Dict = {}
+_imu_ts: float = 0
+_state_lock = Lock()
+
+
+# ============ 订阅回调 ============
+def _on_motor_state(sample):
+    """电机状态回调"""
+    global _motor_state, _motor_ts
+    try:
+        data = _deserialize_msg(sample.payload.to_bytes())
+        with _state_lock:
+            _motor_ts = data.get('ts', time.perf_counter())
+            joints = data.get('joints', {})
+            for k, v in joints.items():
+                _motor_state[int(k)] = v
+    except:
+        pass
+
+
+def _on_imu_state(sample):
+    """IMU状态回调"""
+    global _imu_state, _imu_ts
+    try:
+        data = _deserialize_msg(sample.payload.to_bytes())
+        with _state_lock:
+            _imu_ts = data.get('ts', time.perf_counter())
+            _imu_state = data
+    except:
+        pass
 
 
 # ============ 连接管理 ============
-def connect(address: str, cmd_port: int = 5555):
+def connect(address: str = None, cmd_port: int = 5555, wait_data: bool = True, timeout: float = 5.0):
     """连接服务器"""
-    global _ctx, _dealer, _address
+    global _session, _server_locator, _sub_motor, _sub_imu
     disconnect()
     
-    _ctx = zmq.Context()
-    _address = address
-    _dealer = _ctx.socket(zmq.DEALER)
-    _dealer.setsockopt(zmq.RCVTIMEO, RECV_TIMEOUT_MS)
-    _dealer.setsockopt(zmq.SNDTIMEO, SEND_TIMEOUT_MS)
-    _dealer.setsockopt(zmq.SNDHWM, HWM)
-    _dealer.setsockopt(zmq.RCVHWM, HWM)
-    _dealer.setsockopt(zmq.LINGER, 0)
-    _dealer.connect(f"tcp://{address}:{cmd_port}")
-    print(f"✓ 已连接到 {address}:{cmd_port}")
+    config = zenoh.Config()
+    if address:
+        _server_locator = f"tcp/{address}:{cmd_port}"
+        config.insert_json5("connect/endpoints", f'["{_server_locator}"]')
+    
+    _session = zenoh.open(config)
+    
+    # 订阅状态
+    _sub_motor = _session.declare_subscriber("taks/state/motor", _on_motor_state)
+    _sub_imu = _session.declare_subscriber("taks/state/imu", _on_imu_state)
+    
+    print(f"✓ 已连接到 {address}:{cmd_port}" if address else "✓ Zenoh会话已打开")
+    
+    # 等待数据就绪
+    if wait_data:
+        start = time.time()
+        while time.time() - start < timeout:
+            with _state_lock:
+                has_imu = bool(_imu_state)
+            if has_imu:
+                print("✓ 数据流已就绪")
+                break
+            time.sleep(0.01)
+        else:
+            print("⚠ 等待数据超时，继续运行")
 
 
 def disconnect():
     """断开连接"""
-    global _ctx, _dealer, _address
+    global _session, _server_locator, _sub_motor, _sub_imu, _motor_state, _imu_state
     
-    # 在断开前先失能所有电机
-    if _dealer:
+    # 失能电机
+    if _session:
         try:
-            # 发送 disable_all 命令给所有已注册的设备
-            for device_type in ["Taks-T1", "Taks-T1-semibody", "Taks-T1-leftarm", "Taks-T1-rightarm"]:
-                try:
-                    result = _send({'device': device_type, 'cmd': 'disable_all'})
-                    if result and result.get('ok'):
-                        print(f"✓ {device_type} 电机已失能")
-                except:
-                    pass
-            time.sleep(0.2)  # 等待失能完成
+            for device_type in ["Taks-T1", "Taks-T1-semibody"]:
+                _send_cmd(device_type, "disable_all")
+            time.sleep(0.5)
         except:
             pass
     
-    if _dealer:
-        _dealer.close()
-        _dealer = None
-    if _ctx:
-        _ctx.term()
-        _ctx = None
-    _address = None
+    if _sub_motor:
+        _sub_motor.undeclare()
+        _sub_motor = None
+    if _sub_imu:
+        _sub_imu.undeclare()
+        _sub_imu = None
+    if _session:
+        _session.close()
+        _session = None
+    
+    _server_locator = None
+    _motor_state = {}
+    _imu_state = {}
 
 
-def _send(msg: dict, wait_response: bool = True) -> Optional[dict]:
-    """发送消息，可选择等待响应"""
-    if not _dealer:
+def _send_cmd(device: str, cmd: str, payload: dict = None):
+    """发送命令（Pub模式，不等待响应）"""
+    if not _session:
         raise RuntimeError("未连接，请先调用 connect()")
     
-    data = json.dumps(msg).encode('utf-8')
-    with _lock:
-        try:
-            _dealer.send_multipart([b'', data], zmq.NOBLOCK if not wait_response else 0)
-        except zmq.Again:
-            return {'ok': False, 'error': 'send_timeout'}
-        
-        if not wait_response:
-            return None
-        
-        try:
-            frames = _dealer.recv_multipart()
-            return json.loads(frames[-1].decode('utf-8')) if frames else {'ok': False, 'error': 'empty'}
-        except zmq.Again:
-            return {'ok': False, 'error': 'recv_timeout'}
-        except Exception as e:
-            return {'ok': False, 'error': str(e)}
+    key = f"taks/cmd/{device}/{cmd}"
+    data = _serialize_msg(payload) if payload else b""
+    _session.put(key, data)
 
 
-def _send_batch(msgs: list) -> list:
-    """批量发送并接收（按device匹配响应）"""
-    if not _dealer:
-        raise RuntimeError("未连接")
-    
-    # 构建期望的响应映射
-    expected = {}
-    for i, msg in enumerate(msgs):
-        device = msg.get('device', '')
-        if 'imu' in device.lower():
-            expected['imu'] = i
-        else:
-            expected['motor'] = i
-    
-    results = [{'ok': False, 'error': 'no_response'} for _ in msgs]
-    received = 0
-    
-    with _lock:
-        # 批量发送
-        for msg in msgs:
-            _dealer.send_multipart([b'', json.dumps(msg).encode('utf-8')], zmq.NOBLOCK)
-        
-        # 批量接收（根据响应内容匹配）
-        while received < len(msgs):
-            try:
-                frames = _dealer.recv_multipart()
-                if not frames:
-                    continue
-                resp = json.loads(frames[-1].decode('utf-8'))
-                
-                # 根据响应内容判断类型
-                if resp.get('device') == 'imu' or 'data' in resp:
-                    # IMU响应
-                    if 'imu' in expected:
-                        results[expected['imu']] = resp
-                        received += 1
-                elif 'joints' in resp:
-                    # 电机query响应
-                    if 'motor' in expected:
-                        results[expected['motor']] = resp
-                        received += 1
-                else:
-                    # 其他响应，按顺序填充
-                    for i, r in enumerate(results):
-                        if r.get('error') == 'no_response':
-                            results[i] = resp
-                            received += 1
-                            break
-            except zmq.Again:
-                # 超时，跳出
-                break
-            except:
-                break
-    
-    return results
+# ============ 同步读取函数 ============
+def sync_get_all(robot: "TaksDevice", imu: "IMUDevice") -> Tuple[Optional[Dict], Optional[Dict], float]:
+    """
+    同步读取IMU和电机状态（从缓存获取，保证时间步统一）
+    返回: (motor_state, imu_data, timestamp)
+    """
+    with _state_lock:
+        # 只返回该设备关心的关节
+        motor = None
+        if _motor_state:
+            motor = {jid: _motor_state[jid] for jid in robot.joints if jid in _motor_state}
+            if not motor:
+                motor = None
+        imu_data = dict(_imu_state) if _imu_state else None
+        ts = max(_motor_ts, _imu_ts) if _motor_ts or _imu_ts else time.perf_counter()
+    return motor, imu_data, ts
+
+
+def sync_get_state_only(robot: "TaksDevice") -> Tuple[Optional[Dict], float]:
+    """同步读取电机状态"""
+    with _state_lock:
+        motor = None
+        if _motor_state:
+            motor = {jid: _motor_state[jid] for jid in robot.joints if jid in _motor_state}
+            if not motor:
+                motor = None
+        ts = _motor_ts if _motor_ts else time.perf_counter()
+    return motor, ts
+
+
+def sync_get_imu_only(imu: "IMUDevice") -> Tuple[Optional[Dict], float]:
+    """同步读取IMU数据"""
+    with _state_lock:
+        imu_data = dict(_imu_state) if _imu_state else None
+        ts = _imu_ts if _imu_ts else time.perf_counter()
+    return imu_data, ts
 
 
 # ============ 设备类 ============
 class TaksDevice:
     """Taks电机设备"""
     
-    # 关节映射
     JOINT_MAP = {
         "Taks-T1": [1,2,3,4,5,6,7, 9,10,11,12,13,14,15, 17,18,19, 20,21,22, 23,24,25,26,27,28, 29,30,31,32,33,34],
         "Taks-T1-leftarm": list(range(9, 16)),
@@ -171,7 +255,6 @@ class TaksDevice:
         self._joint_objs: Dict[int, "TaksDevice._JointProxy"] = {}
     
     class _JointProxy:
-        """单个关节的便捷访问器"""
         def __init__(self, device: "TaksDevice", jid: int):
             self._device = device
             self._jid = jid
@@ -206,31 +289,27 @@ class TaksDevice:
         raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
     
     def _register(self):
-        return _send({'device': self.device_type, 'cmd': 'register'})
+        _send_cmd(self.device_type, "register")
+        time.sleep(2.0)  # 等待注册完成
     
     def GetState(self) -> Optional[Dict[int, Dict]]:
-        """获取所有关节状态 {jid: {'pos', 'vel', 'tau'}}"""
-        result = _send({'device': self.device_type, 'cmd': 'query', 'jids': []})
-        if result and result.get('ok') and 'joints' in result:
-            state = {int(k): v for k, v in result['joints'].items()}
-            _motor_cache[self.device_type] = state
-            return state
-        return _motor_cache.get(self.device_type)
+        """获取所有关节状态（从缓存）"""
+        with _state_lock:
+            if _motor_state:
+                return {jid: _motor_state[jid] for jid in self.joints if jid in _motor_state}
+        return None
     
     def GetPosition(self) -> Optional[Dict[int, float]]:
-        """获取位置"""
         state = self.GetState()
         return {jid: s['pos'] for jid, s in state.items()} if state else None
     
     def SetPosition(self, **kwargs):
-        """设置位置: SetPosition(j1=0.1, j2=0.2)"""
         joints = {int(k[1:]): v for k, v in kwargs.items() if k.startswith('j') and v is not None}
         if joints:
-            _send({'device': self.device_type, 'cmd': 'pos', 'joints': joints}, wait_response=False)
+            _send_cmd(self.device_type, "pos", {'joints': joints})
     
     def controlMIT(self, joints: dict):
-        """MIT控制: {jid: {'q', 'dq', 'tau', 'kp', 'kd'}}"""
-        _send({'device': self.device_type, 'cmd': 'mit', 'joints': joints}, wait_response=False)
+        _send_cmd(self.device_type, "mit", {'joints': joints})
 
 
 class IMUDevice:
@@ -240,40 +319,27 @@ class IMUDevice:
         self.device_type = "Taks-T1-imu"
     
     def _register(self):
-        return _send({'device': self.device_type, 'cmd': 'register'})
+        pass  # IMU自动发布，无需注册
     
-    def get_all_data(self) -> Optional[Dict]:
-        result = _send({'device': self.device_type, 'cmd': 'get_all'})
-        if result and result.get('ok') and 'data' in result:
-            _imu_cache.update(result['data'])
-            return result['data']
-        return _imu_cache if _imu_cache else None
+    def get_all(self) -> Optional[Dict]:
+        with _state_lock:
+            return dict(_imu_state) if _imu_state else None
     
     def get_ang_vel(self) -> Optional[Dict]:
-        data = self.get_all_data()
-        return data.get('ang_vel') if data else _imu_cache.get('ang_vel')
+        data = self.get_all()
+        return data.get('ang_vel') if data else None
     
     def get_lin_acc(self) -> Optional[Dict]:
-        data = self.get_all_data()
-        return data.get('lin_acc') if data else _imu_cache.get('lin_acc')
+        data = self.get_all()
+        return data.get('lin_acc') if data else None
     
     def get_quat(self) -> Optional[Dict]:
-        data = self.get_all_data()
-        return data.get('quat') if data else _imu_cache.get('quat')
+        data = self.get_all()
+        return data.get('quat') if data else None
     
     def get_rpy(self) -> Optional[Dict]:
-        result = _send({'device': self.device_type, 'cmd': 'rpy'})
-        if result and result.get('ok') and 'data' in result:
-            return result['data']
-        return _imu_cache.get('rpy')
-    
-    def calibrate_zero(self) -> bool:
-        result = _send({'device': self.device_type, 'cmd': 'cal_zero'})
-        return result.get('ok', False) if result else False
-
-    def calibrate_gyro(self) -> bool:
-        result = _send({'device': self.device_type, 'cmd': 'cal_gyro'})
-        return result.get('ok', False) if result else False
+        data = self.get_all()
+        return data.get('rpy') if data else None
 
 
 # ============ 全局函数 ============
@@ -285,30 +351,3 @@ def register(device_type: str):
         dev = TaksDevice(device_type)
     dev._register()
     return dev
-
-
-def batch_query(robot: TaksDevice, imu: IMUDevice) -> tuple:
-    """并行查询电机+IMU"""
-    msgs = [
-        {'device': robot.device_type, 'cmd': 'query', 'jids': []},
-        {'device': imu.device_type, 'cmd': 'get_all'}
-    ]
-    results = _send_batch(msgs)
-    
-    # 电机状态
-    motor_state = None
-    if results[0].get('ok') and 'joints' in results[0]:
-        motor_state = {int(k): v for k, v in results[0]['joints'].items()}
-        _motor_cache[robot.device_type] = motor_state
-    else:
-        motor_state = _motor_cache.get(robot.device_type)
-    
-    # IMU数据
-    imu_data = None
-    if results[1].get('ok') and 'data' in results[1]:
-        imu_data = results[1]['data']
-        _imu_cache.update(imu_data)
-    else:
-        imu_data = _imu_cache if _imu_cache else None
-    
-    return motor_state, imu_data

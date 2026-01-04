@@ -21,6 +21,7 @@ from rich.console import Console
 from rich.table import Table
 
 import taks
+from taks import sync_get_all
 from data_utils.rot_utils import quatToEuler
 from robot_control.fall_detector import FallDetector, FallProtectionController
 
@@ -119,6 +120,38 @@ class EMASmoother:
         self.value = None
 
 
+class ObservationFilter:
+    """观测滤波器 - 对IMU和电机数据进行EMA滤波"""
+    def __init__(self, alpha_imu=0.3, alpha_motor=0.5):
+        # IMU滤波器
+        self.quat_filter = EMASmoother(alpha=alpha_imu)
+        self.ang_vel_filter = EMASmoother(alpha=alpha_imu)
+        # 电机滤波器
+        self.dof_pos_filter = EMASmoother(alpha=alpha_motor)
+        self.dof_vel_filter = EMASmoother(alpha=alpha_motor)
+    
+    def filter_imu(self, quat, ang_vel):
+        """滤波IMU数据"""
+        quat_filtered = self.quat_filter.smooth(quat)
+        # 四元数归一化
+        quat_filtered = quat_filtered / max(np.linalg.norm(quat_filtered), 1e-6)
+        ang_vel_filtered = self.ang_vel_filter.smooth(ang_vel)
+        return quat_filtered, ang_vel_filtered
+    
+    def filter_motor(self, dof_pos, dof_vel):
+        """滤波电机数据"""
+        dof_pos_filtered = self.dof_pos_filter.smooth(dof_pos)
+        dof_vel_filtered = self.dof_vel_filter.smooth(dof_vel)
+        return dof_pos_filtered, dof_vel_filtered
+    
+    def reset(self):
+        """重置所有滤波器"""
+        self.quat_filter.reset()
+        self.ang_vel_filter.reset()
+        self.dof_pos_filter.reset()
+        self.dof_vel_filter.reset()
+
+
 class OnnxPolicyWrapper:
     """ONNX策略包装器"""
     def __init__(self, session, input_name):
@@ -207,6 +240,10 @@ class TaksT1RealController:
         else:
             self.fall_detector = self.fall_controller = None
         
+        # 观测滤波器
+        self.obs_filter = ObservationFilter(alpha_imu=0.3, alpha_motor=0.5)
+        print(f"观测滤波已启用: alpha_imu=0.3, alpha_motor=0.5")
+        
         # 控制状态
         self.robot = self.imu = None
         self.running = False
@@ -239,13 +276,14 @@ class TaksT1RealController:
         print("已断开连接")
     
     def get_robot_state(self):
-        joint_states, imu_data = taks.batch_query(self.robot, self.imu)
+        """同步读取电机和IMU状态，保证时间步统一"""
+        motor_state, imu_data, sync_ts = sync_get_all(self.robot, self.imu)
         
         dof_pos = np.zeros(self.num_actions, dtype=np.float32)
         dof_vel = np.zeros(self.num_actions, dtype=np.float32)
         
-        if joint_states:
-            for sdk_jid, state in joint_states.items():
+        if motor_state:
+            for sdk_jid, state in motor_state.items():
                 if sdk_jid in SDK_TO_POLICY_JOINT_MAP:
                     idx = SDK_TO_POLICY_JOINT_MAP[sdk_jid]
                     dof_pos[idx] = state.get('pos', 0.0)
@@ -263,6 +301,10 @@ class TaksT1RealController:
             ang_vel_data = imu_data.get('ang_vel')
             if ang_vel_data and 'x' in ang_vel_data:
                 self.last_valid_ang_vel = ang_vel = np.array([ang_vel_data['x'], ang_vel_data['y'], ang_vel_data['z']], dtype=np.float32)
+        
+        # 应用滤波
+        quat, ang_vel = self.obs_filter.filter_imu(quat, ang_vel)
+        dof_pos, dof_vel = self.obs_filter.filter_motor(dof_pos, dof_vel)
         
         return dof_pos, dof_vel, quat, ang_vel
     
@@ -475,7 +517,7 @@ def main():
     parser.add_argument('--device', type=str, default='cuda')
     parser.add_argument('--server_ip', type=str, default='192.168.36.36')
     parser.add_argument('--cmd_port', type=int, default=5555)
-    parser.add_argument('--smooth_body', type=float, default=0.0, help='EMA平滑系数 (0=关闭)')
+    parser.add_argument('--smooth_body', type=float, default=0.1, help='EMA平滑系数 (0=关闭,1=完全开启)')
     parser.add_argument('--no_fall_protection', action='store_true')
     parser.add_argument('--fall_roll_threshold', type=float, default=1.0)
     parser.add_argument('--fall_pitch_threshold', type=float, default=1.0)
