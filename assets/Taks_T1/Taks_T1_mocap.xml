@@ -5,22 +5,22 @@
     <motor ctrlrange="-1 1" ctrllimited="true"/>
     <joint actuatorfrclimited="true" type="hinge"/>
     <default class="torso_motor">
-      <joint damping="0.05" armature="0.01" frictionloss="0.2"/>
-    </default>
-    <default class="leg_motor">
-      <joint damping="0.05" armature="0.01" frictionloss="0.2"/>
-    </default>
-    <default class="ankle_motor">
-      <joint damping="0.05" armature="0.01" frictionloss="0.2"/>
-    </default>
-    <default class="arm_motor">
-      <joint damping="0.05" armature="0.01" frictionloss="0.2"/>
-    </default>
-    <default class="wrist_motor">
       <joint damping="0.05" armature="0.01" frictionloss="0.1"/>
     </default>
+    <default class="leg_motor">
+      <joint damping="0.05" armature="0.01" frictionloss="0.1"/>
+    </default>
+    <default class="ankle_motor">
+      <joint damping="0.05" armature="0.01" frictionloss="0.1"/>
+    </default>
+    <default class="arm_motor">
+      <joint damping="0.05" armature="0.01" frictionloss="0.1"/>
+    </default>
+    <default class="wrist_motor">
+      <joint damping="0.05" armature="0.01" frictionloss="0.01"/>
+    </default>
     <default class="neck_motor">
-      <joint damping="0.02" armature="0.005" frictionloss="0.05"/>
+      <joint damping="0.02" armature="0.001" frictionloss="0.01"/>
     </default>
   </default>
 
