@@ -85,6 +85,19 @@ def _deserialize_msg(data: bytes) -> dict:
                 msg[name] = val
     return msg
 
+# ============ 夹爪配置 ============
+# 夹爪位置定义 (电机弧度位置)
+GRIPPER_OPEN = 0.0       # 打开位置
+GRIPPER_CLOSE = -1.1     # 闭合位置
+
+# 左右手夹爪镜像配置 (预留，目前默认都一样)
+RIGHT_GRIPPER_DIRECTION = 1  # 右手夹爪方向系数
+LEFT_GRIPPER_DIRECTION = 1   # 左手匹爪方向系数 (如需镜像改为-1)
+
+# 夹爪关节ID
+RIGHT_GRIPPER_ID = 8   # 右手夹爪
+LEFT_GRIPPER_ID = 16   # 左手夹爪
+
 # ============ 全局状态 ============
 _session: Optional[zenoh.Session] = None
 _server_locator: Optional[str] = None
@@ -247,6 +260,8 @@ class TaksDevice:
         "Taks-T1-leftarm": list(range(9, 16)),
         "Taks-T1-rightarm": list(range(1, 8)),
         "Taks-T1-semibody": [1,2,3,4,5,6,7, 9,10,11,12,13,14,15, 17,18,19, 20,21,22],
+        "Taks-T1-rightgripper": [8],
+        "Taks-T1-leftgripper": [16],
     }
     
     def __init__(self, device_type: str):
@@ -319,7 +334,8 @@ class IMUDevice:
         self.device_type = "Taks-T1-imu"
     
     def _register(self):
-        pass  # IMU自动发布，无需注册
+        _send_cmd(self.device_type, "register")
+        time.sleep(2.0)
     
     def get_all(self) -> Optional[Dict]:
         with _state_lock:
@@ -342,11 +358,77 @@ class IMUDevice:
         return data.get('rpy') if data else None
 
 
+class GripperDevice:
+    """夹爪设备"""
+    
+    def __init__(self, is_left: bool = False):
+        """
+        初始化夹爪设备
+        :param is_left: True=左手夹爪, False=右手匹爪
+        """
+        self.is_left = is_left
+        self.gripper_id = LEFT_GRIPPER_ID if is_left else RIGHT_GRIPPER_ID
+        self.device_type = "Taks-T1-leftgripper" if is_left else "Taks-T1-rightgripper"
+    
+    def _register(self):
+        _send_cmd(self.device_type, "register")
+        time.sleep(2.0)
+    
+    def SetOC(self, close: bool):
+        """
+        设置夹爪开合状态
+        :param close: True=闭合(1), False=打开(0)
+        """
+        _send_cmd(self.device_type, "gripper_oc", {
+            'gripper_id': self.gripper_id,
+            'close': close
+        })
+    
+    def SetPosition(self, percent: float):
+        """
+        设置夹爪位置百分比
+        :param percent: 0-100, 0=完全打开, 100=完全闭合
+        """
+        _send_cmd(self.device_type, "gripper_pos", {
+            'gripper_id': self.gripper_id,
+            'percent': percent
+        })
+    
+    def controlMIT(self, percent: float, kp: float = None, kd: float = None):
+        """
+        MIT控制模式
+        :param percent: 0-100位置百分比, 0=完全打开, 100=完全闭合
+        :param kp: 可选，自定义kp值
+        :param kd: 可选，自定义kd值
+        """
+        payload = {
+            'gripper_id': self.gripper_id,
+            'percent': percent
+        }
+        if kp is not None:
+            payload['kp'] = kp
+        if kd is not None:
+            payload['kd'] = kd
+        _send_cmd(self.device_type, "gripper_mit", payload)
+    
+    def open(self):
+        """打开匹爪"""
+        self.SetOC(False)
+    
+    def close(self):
+        """闭合匹爪"""
+        self.SetOC(True)
+
+
 # ============ 全局函数 ============
 def register(device_type: str):
     """注册设备"""
     if device_type == "Taks-T1-imu":
         dev = IMUDevice()
+    elif device_type == "Taks-T1-rightgripper":
+        dev = GripperDevice(is_left=False)
+    elif device_type == "Taks-T1-leftgripper":
+        dev = GripperDevice(is_left=True)
     else:
         dev = TaksDevice(device_type)
     dev._register()
