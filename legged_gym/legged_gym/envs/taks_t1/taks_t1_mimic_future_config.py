@@ -131,18 +131,6 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
         # 刚体惯性随机化 - 模拟连杆惯性不确定性
         randomize_link_inertia = (True and domain_rand_general)
         link_inertia_range = [0.5, 2.0]  # 刚体惯性缩放范围
-        
-        # 通信延迟随机化 - 模拟真实硬件通信不同步
-        comm_delay = (True and domain_rand_general)
-        comm_delay_buf_len = 10  # 延迟buffer长度(步数)
-        # 电机位置/速度/扭矩各自的延迟范围(步数)
-        motor_pos_delay_range = [0, 4]
-        motor_vel_delay_range = [0, 4]
-        motor_torque_delay_range = [0, 4]
-        # IMU与电机的相对延迟范围(步数，正值表示IMU比电机慢)
-        imu_motor_delay_range = [-6, 6]
-        # 每个episode是否重新采样延迟
-        resample_delay_per_episode = True
 
         # PD增益随机化 - 模拟关节刚度和阻尼不确定性
         randomize_pd_gain = (True and domain_rand_general)
