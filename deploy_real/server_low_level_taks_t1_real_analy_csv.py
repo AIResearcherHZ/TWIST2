@@ -171,10 +171,9 @@ class TaksT1RealController:
         self.history_len = 10
         self.total_obs_size = self.n_obs_single * (self.history_len + 1) + self.n_mimic_obs
         
-        # 历史缓冲
-        self.proprio_history_buf = deque(maxlen=self.history_len)
-        for _ in range(self.history_len):
-            self.proprio_history_buf.append(np.zeros(self.n_obs_single, dtype=np.float32))
+        # 历史缓冲 - 使用numpy数组替代deque，提高效率
+        self.proprio_history_buf = np.zeros((self.history_len, self.n_obs_single), dtype=np.float32)
+        self._hist_idx = 0  # 环形缓冲区索引
         self.last_action = np.zeros(self.num_actions, dtype=np.float32)
         
         # 默认mimic观测
@@ -480,10 +479,14 @@ class TaksT1RealController:
                             neck = np.array(json.loads(results[2]), dtype=np.float32)
                             action_mimic = np.concatenate([action_mimic, [neck[0], 0.0, neck[1]]])
                 
-                # 构建观测
+                # 构建观测 - 使用环形缓冲区
                 obs_full = np.concatenate([action_mimic, obs_proprio])
-                obs_hist = np.array(self.proprio_history_buf).flatten()
-                self.proprio_history_buf.append(obs_full)
+                # 获取历史观测（从新到旧）
+                hist_indices = [(self._hist_idx - i) % self.history_len for i in range(self.history_len)]
+                obs_hist = self.proprio_history_buf[hist_indices].flatten()
+                # 更新环形缓冲区
+                self._hist_idx = (self._hist_idx + 1) % self.history_len
+                self.proprio_history_buf[self._hist_idx] = obs_full
                 obs_buf = np.concatenate([obs_full, obs_hist, action_mimic])
                 
                 # 运行policy
