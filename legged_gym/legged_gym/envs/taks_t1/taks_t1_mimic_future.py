@@ -825,20 +825,3 @@ class TaksT1MimicFuture(TaksT1MimicDistill):
         """Penalize non-flat base orientation (roll and pitch).
         Uses projected_gravity which is already computed for GPU efficiency."""
         return torch.sum(torch.square(self.projected_gravity[:, :2]), dim=1)
-
-    def _reward_com_stability(self):
-        """惩罚CoM水平方向偏移，防止被推时身体晃动过大。
-        使用base相对于支撑脚的水平位置偏移。"""
-        # 计算双脚中心位置
-        feet_pos = self.rigid_body_states[:, self.feet_indices, :2]  # [N, 2, 2]
-        feet_center = feet_pos.mean(dim=1)  # [N, 2]
-        # base水平位置
-        base_xy = self.root_states[:, :2]  # [N, 2]
-        # 水平偏移
-        com_offset = base_xy - feet_center
-        return torch.sum(torch.square(com_offset), dim=1)
-
-    def _reward_com_velocity(self):
-        """惩罚CoM水平速度过大，鼓励平稳移动。"""
-        com_vel_xy = self.root_states[:, 7:9]  # [N, 2] 水平速度
-        return torch.sum(torch.square(com_vel_xy), dim=1)

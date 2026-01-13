@@ -185,11 +185,6 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             future_action_consistency = 1.0  # Set to None to disable
             future_yaw_consistency = 0.1  # Set to None to disable
             turning_smoothness = -0.01  # Set to None to disable
-            
-            # 身体重心稳定奖励 - 防止被推时身体晃动过大
-            com_stability = -1.0  # CoM水平偏移惩罚
-            com_velocity = -0.1  # CoM水平速度惩罚
-
 
 class TaksT1MimicStuFutureCfgDAgger(TaksT1MimicStuFutureCfg):
     seed = 1

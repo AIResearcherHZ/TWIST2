@@ -132,10 +132,10 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
         randomize_link_inertia = (True and domain_rand_general)
         link_inertia_range = [0.5, 2.0]  # 刚体惯性缩放范围
 
-        # PD增益随机化 - 模拟关节刚度和阻尼不确定性
-        randomize_pd_gain = (True and domain_rand_general)
-        stiffness_range = [0.5, 1.5]  # stiffness缩放范围
-        damping_range = [0.5, 5.0]    # damping缩放范围
+        # # PD增益随机化 - 模拟关节刚度和阻尼不确定性
+        # randomize_pd_gain = (True and domain_rand_general)
+        # stiffness_range = [0.5, 1.5]  # stiffness缩放范围
+        # damping_range = [0.5, 5.0]    # damping缩放范围
 
     class noise(TaksT1MimicPrivCfg.noise):
         add_noise = True
@@ -200,11 +200,6 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             future_action_consistency = 1.0  # Set to None to disable
             future_yaw_consistency = 0.1  # Set to None to disable
             turning_smoothness = -0.01  # Set to None to disable
-            
-            # 身体重心稳定奖励 - 防止被推时身体晃动过大
-            com_stability = -1.0  # CoM水平偏移惩罚
-            com_velocity = -0.1  # CoM水平速度惩罚
-
 
 class TaksT1MimicStuFutureCfgDAgger(TaksT1MimicStuFutureCfg):
     seed = 1
