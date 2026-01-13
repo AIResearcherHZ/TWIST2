@@ -3,7 +3,7 @@
 Taks-T1 Sim2Real 部署脚本 (重构版)
 - 位置控制模式 (MIT: kp/kd有值, q有值, dq=0, tau=0)
 - 训练配置: sim.dt=0.002, decimation=10, 控制dt=0.02s=50Hz
-- 缓启动/缓关闭, EMA平滑, 跌倒保护
+- 缓启动, EMA平滑, 跌倒保护
 """
 import sys
 sys.path.insert(0, '/home/rex/桌面/TWIST2/taks_sdk')
@@ -36,9 +36,8 @@ DECIMATION = 10
 CONTROL_DT = SIM_DT * DECIMATION  # 0.02s = 50Hz
 CONTROL_FREQ = 1.0 / CONTROL_DT
 
-# 缓启动/缓关闭时间
+# 缓启动时间
 RAMP_UP_TIME = 5.0
-RAMP_DOWN_TIME = 5.0
 TRANSITION_TIME = 2.0
 
 # ============ 全局 KP/KD 配置 ============
@@ -345,7 +344,16 @@ class TaksT1RealController:
         self.console.clear()
         self.console.print(table)
     
+    def _ease_out(self, t: float) -> float:
+        """Ease-out曲线: 由快到慢, t in [0,1] -> [0,1]"""
+        return 1.0 - (1.0 - t) ** 2
+    
+    def _ease_in(self, t: float) -> float:
+        """Ease-in曲线: 由慢到快, t in [0,1] -> [0,1]"""
+        return t ** 2
+    
     def ramp_up(self):
+        """非线性缓启动: kp/kd从0到目标值，使用ease-out曲线（由快到慢）"""
         print(f"缓启动 ({RAMP_UP_TIME}s)...")
         start = time.time()
         target_pos = np.zeros(self.num_actions, dtype=np.float32)
@@ -356,49 +364,28 @@ class TaksT1RealController:
                 self.current_kp_scale = self.current_kd_scale = 1.0
                 break
             
-            self.current_kp_scale = self.current_kd_scale = elapsed / RAMP_UP_TIME
+            # 非线性ease-out曲线：由快到慢
+            t = elapsed / RAMP_UP_TIME
+            scale = self._ease_out(t)
+            self.current_kp_scale = self.current_kd_scale = scale
             self.get_robot_state()
             mit_data = self.send_mit_command(target_pos, self.current_kp_scale, self.current_kd_scale)
             
             self.print_counter += 1
             if self.print_counter >= self.print_interval:
                 self.print_counter = 0
-                self._print_table(mit_data, f"Ramp Up {elapsed:.1f}s/{RAMP_UP_TIME}s")
+                self._print_table(mit_data, f"Ramp Up {elapsed:.1f}s/{RAMP_UP_TIME}s (scale={scale:.2f})")
             
             time.sleep(self.control_dt)
         print("✓ 缓启动完成")
     
-    def ramp_down(self):
-        print(f"缓关闭 ({RAMP_DOWN_TIME}s)...")
-        start = time.time()
-        init_kp, init_kd = self.current_kp_scale, self.current_kd_scale
-        target_pos = np.zeros(self.num_actions, dtype=np.float32)
-        
-        while True:
-            elapsed = time.time() - start
-            if elapsed >= RAMP_DOWN_TIME:
-                self.current_kp_scale = self.current_kd_scale = 0.0
-                break
-            
-            progress = elapsed / RAMP_DOWN_TIME
-            self.current_kp_scale = init_kp * (1.0 - progress)
-            self.current_kd_scale = init_kd * (1.0 - progress)
-            
-            self.get_robot_state()
-            mit_data = self.send_mit_command(target_pos, self.current_kp_scale, self.current_kd_scale)
-            
-            self.print_counter += 1
-            if self.print_counter >= self.print_interval:
-                self.print_counter = 0
-                self._print_table(mit_data, f"Ramp Down {elapsed:.1f}s/{RAMP_DOWN_TIME}s")
-            
-            time.sleep(self.control_dt)
-        
-        self.send_mit_command(target_pos, 0.0, 0.0)
-        print("✓ 缓关闭完成")
-    
     def signal_handler(self, signum, frame):
-        print("\n收到退出信号...")
+        """信号处理: 确保先断开连接再退出"""
+        if self.shutdown_requested:
+            print("\n强制退出...")
+            self.disconnect_robot()
+            sys.exit(1)
+        print("\n收到退出信号，开始安全关闭...")
         self.shutdown_requested = True
     
     def run(self):
@@ -509,7 +496,6 @@ class TaksT1RealController:
             traceback.print_exc()
         finally:
             self.running = False
-            self.ramp_down()
             self.disconnect_robot()
             print("控制器已退出")
 
