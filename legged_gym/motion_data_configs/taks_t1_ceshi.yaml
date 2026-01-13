@@ -58320,3 +58320,78 @@ motions:
 - file: lafan1_taks_t1/dance2_subject5.pkl
   weight: 5.0
   description: general movement
+- file: lafan1_taks_t1/fight1_subject2.pkl
+  weight: 5.0
+  description: general movement
+- file: lafan1_taks_t1/fight1_subject3.pkl
+  weight: 5.0
+  description: general movement
+- file: lafan1_taks_t1/fight1_subject5.pkl
+  weight: 5.0
+  description: general movement
+- file: lafan1_taks_t1/push1_subject2.pkl
+  weight: 5.0
+  description: general movement
+- file: lafan1_taks_t1/pushAndFall1_subject1.pkl
+  weight: 5.0
+  description: general movement
+- file: lafan1_taks_t1/pushAndFall1_subject4.pkl
+  weight: 5.0
+  description: general movement
+- file: lafan1_taks_t1/pushAndStumble1_subject2.pkl
+  weight: 5.0
+  description: general movement
+- file: lafan1_taks_t1/pushAndStumble1_subject3.pkl
+  weight: 5.0
+  description: general movement
+- file: lafan1_taks_t1/pushAndStumble1_subject5.pkl
+  weight: 5.0
+  description: general movement
+- file: lafan1_taks_t1/run1_subject2.pkl
+  weight: 5.0
+  description: general movement
+- file: lafan1_taks_t1/run1_subject5.pkl
+  weight: 5.0
+  description: general movement
+- file: lafan1_taks_t1/run2_subject1.pkl
+  weight: 5.0
+  description: general movement
+- file: lafan1_taks_t1/run2_subject4.pkl
+  weight: 5.0
+  description: general movement
+- file: lafan1_taks_t1/walk1_subject1.pkl
+  weight: 5.0
+  description: general movement
+- file: lafan1_taks_t1/walk1_subject2.pkl
+  weight: 5.0
+  description: general movement
+- file: lafan1_taks_t1/walk1_subject5.pkl
+  weight: 5.0
+  description: general movement
+- file: lafan1_taks_t1/walk2_subject1.pkl
+  weight: 5.0
+  description: general movement
+- file: lafan1_taks_t1/walk2_subject3.pkl
+  weight: 5.0
+  description: general movement
+- file: lafan1_taks_t1/walk2_subject4.pkl
+  weight: 5.0
+  description: general movement
+- file: lafan1_taks_t1/walk3_subject1.pkl
+  weight: 5.0
+  description: general movement
+- file: lafan1_taks_t1/walk3_subject2.pkl
+  weight: 5.0
+  description: general movement
+- file: lafan1_taks_t1/walk3_subject3.pkl
+  weight: 5.0
+  description: general movement
+- file: lafan1_taks_t1/walk3_subject4.pkl
+  weight: 5.0
+  description: general movement
+- file: lafan1_taks_t1/walk3_subject5.pkl
+  weight: 5.0
+  description: general movement
+- file: lafan1_taks_t1/walk4_subject1.pkl
+  weight: 5.0
+  description: general movement
