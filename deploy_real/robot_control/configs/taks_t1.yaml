@@ -17,19 +17,19 @@ joint2motor_idx: [0, 1, 2, 3, 4, 5,       # left leg (6)
                  29, 30, 31               # neck (3)
                  ]
 
-kps: [100, 100, 100, 150, 40, 40,   # left leg
-      100, 100, 100, 150, 40, 40,   # right leg
+kps: [150, 100, 100, 150, 40, 40,   # left leg: hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll
+      150, 100, 100, 150, 40, 40,   # right leg
       150, 150, 150,                # waist
-      40, 40, 40, 40, 20, 20, 20,   # left arm
-      40, 40, 40, 40, 20, 20, 20,   # right arm
-      20, 20, 20]                   # neck
+      20, 20, 20, 20, 10, 10, 10,   # left arm
+      20, 20, 20, 20, 10, 10, 10,   # right arm
+      2.5, 2.5, 2.5]                # neck
 
-kds: [2, 2, 2, 4, 2, 2,   # left leg
-      2, 2, 2, 4, 2, 2,   # right leg
-      4, 4, 4,            # waist
-      5, 5, 5, 5, 1, 1, 1,  # left arm
-      5, 5, 5, 5, 1, 1, 1,  # right arm
-      2, 2, 2]            # neck
+kds: [5, 5, 5, 5, 2, 2,   # left leg: hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll
+      5, 5, 5, 5, 2, 2,   # right leg
+      5, 5, 5,            # waist
+      2, 2, 2, 2, 1, 1, 1,  # left arm
+      2, 2, 2, 2, 1, 1, 1,  # right arm
+      0.5, 0.5, 0.5]      # neck
 
 default_angles: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0,   # left leg
                 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,    # right leg

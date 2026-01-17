@@ -10,6 +10,8 @@ from collections import deque
 import mujoco.viewer as mjv
 from tqdm import tqdm
 import os
+import csv
+from datetime import datetime
 from data_utils.rot_utils import quatToEuler
 from robot_control.fall_detector import FallDetector, FallProtectionController
 
@@ -148,40 +150,78 @@ class RealTimePolicyController:
             ])
         ])
 
+        # ========== 原 sim 参数 (已注释) ==========
         # Stiffness values aligned with taks_t1_mimic_distill_config.py control settings
-        # hip_yaw: 100, hip_roll: 100, hip_pitch: 100, knee: 150, ankle: 40
-        # waist: 150, shoulder: 40, elbow: 40, wrist: 20, neck: 20
+        # hip_yaw: 100, hip_roll: 100, hip_pitch: 150, knee: 150, ankle: 40
+        # waist: 150, shoulder: 20, elbow: 20, wrist: 10, neck: 2.5
         self.stiffness = np.array([
                 # left leg: hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll
-                100, 100, 100, 150, 40, 40,
+                150, 100, 100, 150, 40, 40,
                 # right leg: hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll
-                100, 100, 100, 150, 40, 40,
+                150, 100, 100, 150, 40, 40,
                 # waist: yaw, roll, pitch
                 150, 150, 150,
                 # left arm: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow, wrist_roll, wrist_yaw, wrist_pitch
-                40, 40, 40, 40, 20, 20, 20,
+                20, 20, 20, 20, 10, 10, 10,
                 # right arm: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow, wrist_roll, wrist_yaw, wrist_pitch
-                40, 40, 40, 40, 20, 20, 20,
+                20, 20, 20, 20, 10, 10, 10,
                 # neck: yaw, roll, pitch
-                20, 20, 20,
+                2.5, 2.5, 2.5,
             ])
         # Damping values aligned with taks_t1_mimic_distill_config.py control settings
-        # hip_yaw: 2, hip_roll: 2, hip_pitch: 2, knee: 4, ankle: 2
-        # waist: 4, shoulder: 5, elbow: 5, wrist: 2, neck: 2
+        # hip_yaw: 5, hip_roll: 5, hip_pitch: 5, knee: 5, ankle: 2
+        # waist: 5, shoulder: 2, elbow: 2, wrist: 1, neck: 0.5
         self.damping = np.array([
                 # left leg
-                2, 2, 2, 4, 2, 2,
+                5, 5, 5, 5, 2, 2,
                 # right leg
-                2, 2, 2, 4, 2, 2,
+                5, 5, 5, 5, 2, 2,
                 # waist
-                4, 4, 4,
+                5, 5, 5,
                 # left arm
-                5, 5, 5, 5, 2, 2, 2,
+                2, 2, 2, 2, 1, 1, 1,
                 # right arm
-                5, 5, 5, 5, 2, 2, 2,
+                2, 2, 2, 2, 1, 1, 1,
                 # neck
-                2, 2, 2,
+                0.5, 0.5, 0.5,
             ])
+        
+        # # ========== 使用 real 文件参数 (GLOBAL_KP/GLOBAL_KD) ==========
+        # # 左腿: hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll
+        # # 右腿: hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll
+        # # 腰部: yaw, roll, pitch
+        # # 左臂: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow, wrist_roll, wrist_yaw, wrist_pitch
+        # # 右臂: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow, wrist_roll, wrist_yaw, wrist_pitch
+        # # 脖子: yaw, roll, pitch
+        # self.stiffness = np.array([
+        #     # 左腿 (6)
+        #     50, 150, 150, 50, 20, 20,
+        #     # 右腿 (6)
+        #     50, 150, 150, 50, 20, 20,
+        #     # 腰部 (3)
+        #     150, 150, 150,
+        #     # 左臂 (7)
+        #     20, 20, 20, 20, 10, 10, 10,
+        #     # 右臂 (7)
+        #     20, 20, 20, 20, 10, 10, 10,
+        #     # 脖子 (3)
+        #     1, 1, 1,
+        # ], dtype=np.float32)
+        
+        # self.damping = np.array([
+        #     # 左腿 (6)
+        #     50, 50, 50, 50, 2, 2,
+        #     # 右腿 (6)
+        #     50, 50, 50, 50, 2, 2,
+        #     # 腰部 (3)
+        #     25, 25, 25,
+        #     # 左臂 (7)
+        #     8, 8, 8, 8, 1, 1, 1,
+        #     # 右臂 (7)
+        #     8, 8, 8, 8, 1, 1, 1,
+        #     # 脖子 (3)
+        #     0.1, 0.1, 0.1,
+        # ], dtype=np.float32)
 
         # Torque limits from XML actuatorfrcrange
         # left/right leg: hip_pitch=120, hip_roll=97, hip_yaw=97, knee=120, ankle=27
@@ -269,6 +309,11 @@ class RealTimePolicyController:
         else:
             self.fall_detector = None
             self.fall_controller = None
+        
+        # CSV logging
+        self.csv_file = None
+        self.csv_writer = None
+        self.csv_start_time = None
 
     def reset_sim(self):
         """Reset simulation to initial state"""
@@ -290,6 +335,106 @@ class RealTimePolicyController:
         ang_vel = self.data.qvel[3:6]
         sim_torque = self.data.ctrl
         return dof_pos, dof_vel, quat, ang_vel, sim_torque
+    
+    def init_csv_logging(self):
+        """初始化CSV日志记录"""
+        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        csv_filename = f"taks_t1_sim_log_{timestamp_str}.csv"
+        self.csv_file = open(csv_filename, 'w', newline='')
+        
+        # 构建CSV表头
+        headers = ['timestamp', 'elapsed_time']
+        
+        # obs_proprio: ang_vel(3) + rpy(2) + dof_pos(32) + dof_vel(32) + last_action(32) = 101
+        headers += [f'ang_vel_{i}' for i in range(3)]
+        headers += ['roll', 'pitch']
+        headers += [f'dof_pos_{i}' for i in range(32)]
+        headers += [f'dof_vel_{i}' for i in range(32)]
+        headers += [f'last_action_{i}' for i in range(32)]
+        
+        # sim_data: 每个关节的 kp, kd, q, dq, tau (32个关节)
+        for i in range(32):
+            headers += [f'sim_joint_{i}_kp', f'sim_joint_{i}_kd', 
+                       f'sim_joint_{i}_q', f'sim_joint_{i}_dq', f'sim_joint_{i}_tau']
+        
+        # ========== 调试参数 ==========
+        # mimic_obs来源标记 (0=default, 1=redis)
+        headers += ['mimic_obs_source']
+        # mimic_obs (38维): xy_vel(2) + z_pos(1) + roll_pitch(2) + yaw_ang_vel(1) + dof_pos(32)
+        headers += [f'mimic_obs_{i}' for i in range(38)]
+        # raw_action (32维): policy原始输出
+        headers += [f'raw_action_{i}' for i in range(32)]
+        # policy_target_pos (32维): 经过action_scale后的目标位置
+        headers += [f'policy_target_pos_{i}' for i in range(32)]
+        # target_dof_pos (32维): 最终目标位置
+        headers += [f'target_dof_pos_{i}' for i in range(32)]
+        # kp_scale, kd_scale: 当前增益缩放
+        headers += ['kp_scale', 'kd_scale']
+        
+        self.csv_writer = csv.writer(self.csv_file)
+        self.csv_writer.writerow(headers)
+        self.csv_start_time = time.time()
+        print(f"CSV日志已初始化: {csv_filename}")
+    
+    def log_to_csv(self, obs_proprio, sim_data, debug_data=None):
+        """将obs_proprio和sim_data写入CSV
+        
+        Args:
+            obs_proprio: 本体感知观测 (101维)
+            sim_data: 仿真数据字典，包含每个关节的 kp, kd, q, dq, tau
+            debug_data: 调试数据字典，包含:
+                - mimic_obs_source: 0=default, 1=redis
+                - mimic_obs: mimic观测 (38维)
+                - raw_action: policy原始输出 (32维)
+                - policy_target_pos: 经过action_scale后的目标位置 (32维)
+                - target_dof_pos: 最终目标位置 (32维)
+                - kp_scale: 当前kp缩放
+                - kd_scale: 当前kd缩放
+        """
+        if self.csv_writer is None:
+            return
+        
+        current_time = time.time()
+        elapsed_time = current_time - self.csv_start_time
+        
+        row = [current_time, elapsed_time]
+        
+        # obs_proprio (101维)
+        row.extend(obs_proprio.tolist())
+        
+        # sim_data (按顺序)
+        for i in range(32):
+            data = sim_data[i]
+            row.extend([data['kp'], data['kd'], data['q'], data['dq'], data['tau']])
+        
+        # ========== 调试参数 ==========
+        if debug_data is not None:
+            row.append(debug_data.get('mimic_obs_source', -1))
+            row.extend(debug_data.get('mimic_obs', np.zeros(38)).tolist())
+            row.extend(debug_data.get('raw_action', np.zeros(32)).tolist())
+            row.extend(debug_data.get('policy_target_pos', np.zeros(32)).tolist())
+            row.extend(debug_data.get('target_dof_pos', np.zeros(32)).tolist())
+            row.append(debug_data.get('kp_scale', -1))
+            row.append(debug_data.get('kd_scale', -1))
+        else:
+            # 填充默认值
+            row.append(-1)  # mimic_obs_source
+            row.extend([0] * 38)  # mimic_obs
+            row.extend([0] * 32)  # raw_action
+            row.extend([0] * 32)  # policy_target_pos
+            row.extend([0] * 32)  # target_dof_pos
+            row.append(-1)  # kp_scale
+            row.append(-1)  # kd_scale
+        
+        self.csv_writer.writerow(row)
+    
+    def close_csv_logging(self):
+        """关闭CSV日志文件"""
+        if self.csv_file:
+            self.csv_file.close()
+            self.csv_file = None
+            self.csv_writer = None
+            print("CSV日志已关闭")
 
     def run(self):
         """Main simulation loop"""
@@ -330,11 +475,17 @@ class RealTimePolicyController:
         kp_scale = 1.0
         kd_scale = 1.0
         pd_target = self.default_dof_pos.copy()
+        
+        # Initialize CSV logging
+        self.init_csv_logging()
 
         try:
             for i in pbar:
                 t_start = time.time()
                 dof_pos, dof_vel, quat, ang_vel, sim_torque = self.extract_data()
+                
+                # Track mimic_obs source for logging
+                mimic_obs_source = 0  # 0=default, 1=redis
                 
                 if i % self.sim_decimation == 0:
                     # Build proprioceptive observation
@@ -349,7 +500,7 @@ class RealTimePolicyController:
                         self.last_action
                     ])
 
-                    print("roll/pitch (rpy):", rpy[:2], "obs_proprio roll/pitch:", obs_proprio[3:5])
+                    # print("roll/pitch (rpy):", rpy[:2], "obs_proprio roll/pitch:", obs_proprio[3:5])
 
                     # 打印关节编号与位置，便于对应 policy idx -> SDK jid
                     # dof_with_idx = [f"{i}:{dof_pos[i]:.4f}" for i in range(self.num_actions)]
@@ -379,9 +530,11 @@ class RealTimePolicyController:
                     # Use default values if Redis data is None
                     if redis_results[0] is None:
                         action_mimic = self.default_mimic_obs.copy()
+                        mimic_obs_source = 0
                     else:
                         action_mimic = np.array(json.loads(redis_results[0]),
                                                 dtype=np.float32)
+                        mimic_obs_source = 1
                     
                     if redis_results[3] is None:
                         action_neck = np.zeros(2, dtype=np.float32)
@@ -453,9 +606,10 @@ class RealTimePolicyController:
                     last_policy_time = current_time
                     
                     self.last_action = raw_action
-                    raw_action = np.clip(raw_action, -10., 10.)
-                    scaled_actions = raw_action * self.action_scale
-                    pd_target = scaled_actions + self.default_dof_pos
+                    raw_action_clipped = np.clip(raw_action, -10., 10.)
+                    scaled_actions = raw_action_clipped * self.action_scale
+                    policy_target_pos = scaled_actions + self.default_dof_pos
+                    pd_target = policy_target_pos.copy()
                     
                     # Fall protection check
                     kp_scale = 1.0
@@ -464,6 +618,31 @@ class RealTimePolicyController:
                         kp_scale, kd_scale, is_fallen = self.fall_controller.check_and_protect_from_rpy(rpy[0], rpy[1])
                         if is_fallen:
                             pd_target = dof_pos  # 保持当前位置
+                    
+                    # 构建仿真数据用于CSV记录
+                    sim_data = {}
+                    for joint_idx in range(self.num_actions):
+                        sim_data[joint_idx] = {
+                            'kp': float(self.stiffness[joint_idx] * kp_scale),
+                            'kd': float(self.damping[joint_idx] * kd_scale),
+                            'q': float(pd_target[joint_idx]),
+                            'dq': float(dof_vel[joint_idx]),
+                            'tau': float(sim_torque[joint_idx])
+                        }
+                    
+                    # 构建调试数据
+                    debug_data = {
+                        'mimic_obs_source': mimic_obs_source,
+                        'mimic_obs': action_mimic,
+                        'raw_action': raw_action,
+                        'policy_target_pos': policy_target_pos,
+                        'target_dof_pos': pd_target,
+                        'kp_scale': kp_scale,
+                        'kd_scale': kd_scale,
+                    }
+                    
+                    # 记录到CSV
+                    self.log_to_csv(obs_proprio, sim_data, debug_data)
 
                     # self.redis_client.set("action_low_level_unitree_g1", json.dumps(raw_action.tolist()))
                     
@@ -508,6 +687,9 @@ class RealTimePolicyController:
             import traceback
             traceback.print_exc()
         finally:
+            # Close CSV logging
+            self.close_csv_logging()
+            
             if mp4_writer is not None:
                 mp4_writer.close()
                 print("Video saved as twist2_simulation.mp4")
