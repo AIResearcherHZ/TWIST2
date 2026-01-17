@@ -61,6 +61,24 @@ GLOBAL_KD = np.array([
     0.1, 0.1, 0.1,             # 脖子
 ], dtype=np.float32)
 
+# GLOBAL_KP = np.array([
+#     100, 100, 100, 150, 40, 40,  # 左腿
+#     100, 100, 100, 150, 40, 40,  # 右腿
+#     150, 150, 150,               # 腰部
+#     40, 40, 40, 40, 20, 20, 20,  # 左臂
+#     40, 40, 40, 40, 20, 20, 20,  # 右臂
+#     20, 20, 20,                  # 脖子
+# ], dtype=np.float32)
+
+# GLOBAL_KD = np.array([
+#     2, 2, 2, 4, 2, 2,  # 左腿
+#     2, 2, 2, 4, 2, 2,  # 右腿
+#     4, 4, 4,           # 腰部
+#     5, 5, 5, 5, 2, 2, 2,  # 左臂
+#     5, 5, 5, 5, 2, 2, 2,  # 右臂
+#     2, 2, 2,             # 脖子
+# ], dtype=np.float32)
+
 # 关节ID映射
 POLICY_TO_SDK_JOINT_MAP = {
     0: 29, 1: 30, 2: 31, 3: 32, 4: 33, 5: 34,   # 左腿
@@ -232,12 +250,12 @@ class TaksT1RealController:
         print(f"连接 Taks-T1: {self.server_ip}:{self.cmd_port}")
         taks.connect(self.server_ip, cmd_port=self.cmd_port)
         self.robot = taks.register("Taks-T1")
-        time.sleep(0.5)
+        print("已注册全身设备")
+        time.sleep(4.0)
+        print("等待4秒后注册IMU...")
         self.imu = taks.register("Taks-T1-imu")
-        print("等待5秒...")
-        for i in range(5, 0, -1):
-            print(f"  {i}...")
-            time.sleep(1)
+        time.sleep(1)
+        print("设备注册完成")
         
     def disconnect_robot(self):
         taks.disconnect()
