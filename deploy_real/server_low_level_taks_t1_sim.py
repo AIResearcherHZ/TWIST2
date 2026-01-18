@@ -153,15 +153,15 @@ class RealTimePolicyController:
         # waist: 150, shoulder: 20, elbow: 20, wrist: 10, neck: 2.5
         self.stiffness = np.array([
                 # left leg: hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll
-                150, 100, 100, 150, 40, 40,
+                100, 100, 100, 150, 40, 40,
                 # right leg: hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll
-                150, 100, 100, 150, 40, 40,
+                100, 100, 100, 150, 40, 40,
                 # waist: yaw, roll, pitch
                 150, 150, 150,
                 # left arm: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow, wrist_roll, wrist_yaw, wrist_pitch
-                20, 20, 20, 20, 10, 10, 10,
+                40, 40, 40, 40, 10, 10, 10,
                 # right arm: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow, wrist_roll, wrist_yaw, wrist_pitch
-                20, 20, 20, 20, 10, 10, 10,
+                40, 40, 40, 40, 10, 10, 10,
                 # neck: yaw, roll, pitch
                 10, 10, 10,
             ])
@@ -170,15 +170,15 @@ class RealTimePolicyController:
         # waist: 5, shoulder: 2, elbow: 2, wrist: 1, neck: 0.5
         self.damping = np.array([
                 # left leg
-                5, 5, 5, 5, 2, 2,
+                3.3, 3.3, 3.3, 5.0, 2.0, 2.0,
                 # right leg
-                5, 5, 5, 5, 2, 2,
+                3.3, 3.3, 3.3, 5.0, 2.0, 2.0,
                 # waist
-                5, 5, 5,
+                5.0, 5.0, 5.0,
                 # left arm
-                2, 2, 2, 2, 1, 1, 1,
+                2.0, 2.0, 2.0, 2.0, 1.0, 1.0, 1.0,
                 # right arm
-                2, 2, 2, 2, 1, 1, 1,
+                2.0, 2.0, 2.0, 2.0, 1.0, 1.0, 1.0,
                 # neck
                 0.5, 0.5, 0.5,
             ])
