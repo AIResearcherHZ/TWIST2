@@ -116,7 +116,7 @@ class TaksT1MimicPrivCfg(HumanoidMimicCfg):
                     'shoulder': 20,
                     'elbow': 20,
                     'wrist': 10,
-                    'neck': 2.5,
+                    'neck': 10,
                     }
         damping = {'hip_yaw': 5,
                     'hip_roll': 5,

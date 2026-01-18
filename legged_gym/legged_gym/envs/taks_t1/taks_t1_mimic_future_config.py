@@ -154,8 +154,8 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
         # ==================== 踉跄控制参数 ====================
         # 收紧termination条件以减少踉跄时间
         # 原值4.0太宽松(约229°)，收紧到1.57(约90°)可更快终止踉跄状态
-        termination_roll = 1.57   # 原值4.0，收紧以更快检测踉跄
-        termination_pitch = 1.57  # 原值4.0，收紧以更快检测踉跄
+        termination_roll = 2.5   # 原值4.0，收紧以更快检测踉跄
+        termination_pitch = 2.5  # 原值4.0，收紧以更快检测踉跄
         # 高度差阈值：原值0.3m，收紧到0.25m，以更快检测失衡
         root_height_diff_threshold = 0.25  # 原值0.3，收紧到0.25m
         
@@ -184,17 +184,17 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             
             # 脚掌着地奖励和脚掌roll/pitch保持不动惩罚
             # feet_flat_contact = 2.0  # 脚掌全部着地奖励
-            # ankle_roll_pitch_penalty = -0.05 # 脚掌roll/pitch偏离惩罚
+            ankle_roll_pitch_penalty = -0.05 # 脚掌roll/pitch偏离惩罚
             
             # 头部neck三关节保持不动惩罚
-            neck_dof_penalty = -0.25  # neck三关节偏离惩罚(原值-0.5)
+            neck_dof_penalty = -0.5  # neck三关节偏离惩罚(原值-0.5)
             
             # 骨盆加速度约束 - 鼓励平滑运动
             pelvis_lin_acc = -5e-7  # 骨盆线性加速度惩罚
             pelvis_ang_acc = -1e-7  # 骨盆角加速度惩罚
             
             # 姿态保持 - 保持躯干平坦
-            flat_orientation = -0.1  # roll/pitch偏离惩罚(原值-0.5)
+            flat_orientation = -0.5  # roll/pitch偏离惩罚(原值-0.5)
 
             # 未来动作一致性奖励（只在训练时生效）- Set to None to disable
             future_action_consistency = 1.0  # Set to None to disable

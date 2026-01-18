@@ -22,7 +22,7 @@ kps: [150, 100, 100, 150, 40, 40,   # left leg: hip_pitch, hip_roll, hip_yaw, kn
       150, 150, 150,                # waist
       20, 20, 20, 20, 10, 10, 10,   # left arm
       20, 20, 20, 20, 10, 10, 10,   # right arm
-      2.5, 2.5, 2.5]                # neck
+      10, 10, 10]                # neck
 
 kds: [5, 5, 5, 5, 2, 2,   # left leg: hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll
       5, 5, 5, 5, 2, 2,   # right leg
