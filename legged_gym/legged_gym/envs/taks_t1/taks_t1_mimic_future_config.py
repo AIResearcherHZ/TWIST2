@@ -184,13 +184,13 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             
             # 脚掌着地奖励和脚掌roll/pitch保持不动惩罚
             # feet_flat_contact = 2.0  # 脚掌全部着地奖励
-            ankle_roll_pitch_penalty = -0.05 # 脚掌roll/pitch偏离惩罚
+            # ankle_roll_pitch_penalty = -0.05 # 脚掌roll/pitch偏离惩罚
             
             # 头部neck三关节保持不动惩罚
             neck_dof_penalty = -2.0  # neck三关节偏离惩罚(原值-0.5)
             
             # 头部姿态直立惩罚（基于head link的orientation）
-            head_orientation_penalty = -2.0  # 头部roll/pitch偏离直立惩罚(原值-0.5)s
+            # head_orientation_penalty = -2.0  # 头部roll/pitch偏离直立惩罚(原值-0.5)
             
             # 骨盆加速度约束 - 鼓励平滑运动
             pelvis_lin_acc = -5e-7  # 骨盆线性加速度惩罚
