@@ -154,30 +154,30 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
         # ==================== 踉跄控制参数 ====================
         # 收紧termination条件以减少踉跄时间
         # 原值4.0太宽松(约229°)，收紧到1.57(约90°)可更快终止踉跄状态
-        termination_roll = 2.5   # 原值4.0，收紧以更快检测踉跄
-        termination_pitch = 2.5  # 原值4.0，收紧以更快检测踉跄
+        termination_roll = 1.57   # 原值4.0，收紧以更快检测踉跄
+        termination_pitch = 1.57  # 原值4.0，收紧以更快检测踉跄
         # 高度差阈值：原值0.3m，收紧到0.25m，以更快检测失衡
         root_height_diff_threshold = 0.25  # 原值0.3，收紧到0.25m
         
         class scales:
-            tracking_joint_dof = 2.0  # Set to None to disable
-            tracking_joint_vel = 0.2  # Set to None to disable
-            tracking_root_translation_z = 1.0  # Set to None to disable
-            tracking_root_rotation = 1.0  # Set to None to disable
-            tracking_root_linear_vel = 1.0  # Set to None to disable
-            tracking_root_angular_vel = 1.0  # Set to None to disable
-            tracking_keybody_pos = 2.0  # Set to None to disable
-            tracking_keybody_pos_global = 2.0  # Set to None to disable
-            alive = 0.5  # Set to None to disable
-            feet_slip = -0.1  # Set to None to disable
-            feet_contact_forces = -5e-4  # Set to None to disable
+            tracking_joint_dof = 3.0  # Set to None to disable(原值2.0)
+            tracking_joint_vel = 0.3  # Set to None to disable(原值0.2)
+            tracking_root_translation_z = 1.5  # Set to None to disable(原值1.0)
+            tracking_root_rotation = 1.5  # Set to None to disable(原值1.0)
+            tracking_root_linear_vel = 1.5  # Set to None to disable(原值1.0)
+            tracking_root_angular_vel = 1.5  # Set to None to disable(原值1.0)
+            tracking_keybody_pos = 2.5  # Set to None to disable(原值2.0)
+            tracking_keybody_pos_global = 2.5  # Set to None to disable(原值2.0)
+            alive = 0.75  # Set to None to disable(原值0.5)
+            feet_slip = -0.2  # Set to None to disable(原值-0.1)
+            feet_contact_forces = -5e-4  # Set to None to disable(原值-5e-4)
             feet_stumble = -1.25  # 增强踉跄惩罚(原值-1.25)
-            dof_pos_limits = -5.0  # Set to None to disable
-            dof_torque_limits = -1.0  # Set to None to disable
-            dof_vel = -1e-4  # Set to None to disable
-            dof_acc = -1e-7  # Set to None to disable
-            action_rate = -0.1  # Set to None to disable
-            feet_air_time = 5.0  # Set to None to disable
+            dof_pos_limits = -5.0  # Set to None to disable(原值-5.0)
+            dof_torque_limits = -1.0  # Set to None to disable(原值-1.0)
+            dof_vel = -1e-4  # Set to None to disable(原值-1e-4)
+            dof_acc = -1e-7  # Set to None to disable(原值-1e-7)
+            action_rate = -0.1  # Set to None to disable(原值-0.1)
+            feet_air_time = 5.0  # Set to None to disable(原值5.0)
             ang_vel_xy = -0.02  # 增强角速度惩罚(原值-0.02)，抑制踉跄时的摇摆
             ankle_dof_acc = -1e-7 * 2  # Set to None to disable(原来是*2)
             ankle_dof_vel = -1e-4 * 2  # Set to None to disable(原来是*2)
@@ -187,7 +187,7 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             ankle_roll_pitch_penalty = -0.05 # 脚掌roll/pitch偏离惩罚
             
             # 头部neck三关节保持不动惩罚
-            neck_dof_penalty = -0.5  # neck三关节偏离惩罚(原值-0.5)
+            neck_dof_penalty = -2.0  # neck三关节偏离惩罚(原值-0.5)
             
             # 骨盆加速度约束 - 鼓励平滑运动
             pelvis_lin_acc = -5e-7  # 骨盆线性加速度惩罚
