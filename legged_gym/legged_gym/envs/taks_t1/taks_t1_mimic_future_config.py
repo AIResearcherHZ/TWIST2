@@ -190,7 +190,7 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             neck_dof_penalty = -2.0  # neck三关节偏离惩罚(原值-0.5)
             
             # 头部姿态直立惩罚（基于head link的orientation）
-            head_orientation_penalty = -2.0  # 头部roll/pitch偏离直立惩罚
+            head_orientation_penalty = -2.0  # 头部roll/pitch偏离直立惩罚(原值-0.5)s
             
             # 骨盆加速度约束 - 鼓励平滑运动
             pelvis_lin_acc = -5e-7  # 骨盆线性加速度惩罚

@@ -20,9 +20,9 @@ joint2motor_idx: [0, 1, 2, 3, 4, 5,       # left leg (6)
 kps: [100, 100, 100, 150, 40, 40,   # left leg: hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll
       100, 100, 100, 150, 40, 40,   # right leg
       150, 150, 150,                # waist
-      40, 40, 40, 40, 10, 10, 10,   # left arm
-      40, 40, 40, 40, 10, 10, 10,   # right arm
-      10, 10, 10]                # neck
+      40, 40, 40, 40, 20, 20, 20,   # left arm
+      40, 40, 40, 40, 20, 20, 20,   # right arm
+      20, 20, 20]                # neck
 
 kds: [3.3, 3.3, 3.3, 5.0, 2.0, 2.0,   # left leg: hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll
       3.3, 3.3, 3.3, 5.0, 2.0, 2.0,   # right leg
