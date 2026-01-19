@@ -84,6 +84,14 @@ class TaksT1MimicFuture(TaksT1MimicDistill):
         if self.enable_comm_delay:
             self._init_comm_delay_buffers(cfg)
 
+        # 头部link index，用于头部姿态约束
+        self._head_body_idx = self.gym.find_actor_rigid_body_handle(
+            self.envs[0], self.actor_handles[0], 'neck_pitch_link')
+        if self._head_body_idx == -1:
+            print("Warning: neck_pitch_link not found, head orientation penalty disabled")
+        else:
+            print(f"Head orientation penalty enabled, neck_pitch_link index: {self._head_body_idx}")
+
     def _get_unified_motion_data(self):
         if (self.obs_type == 'student_future' and
                 hasattr(self, '_tar_motion_steps_future')):
@@ -825,3 +833,25 @@ class TaksT1MimicFuture(TaksT1MimicDistill):
         """Penalize non-flat base orientation (roll and pitch).
         Uses projected_gravity which is already computed for GPU efficiency."""
         return torch.sum(torch.square(self.projected_gravity[:, :2]), dim=1)
+
+    def _reward_head_orientation_penalty(self):
+        """惩罚头部link姿态偏离直立（roll和pitch偏离0）。
+        通过head link的四元数计算其相对于世界坐标系的roll和pitch。
+        """
+        if not hasattr(self, '_head_body_idx') or self._head_body_idx == -1:
+            return torch.zeros(self.num_envs, device=self.device)
+        
+        # 获取头部link的四元数 (num_envs, 4)
+        head_quat = self.rigid_body_states[:, self._head_body_idx, 3:7]
+        
+        # 计算头部相对于世界坐标系的roll和pitch
+        # 使用projected gravity方法：将重力向量投影到头部坐标系
+        gravity_vec = torch.tensor([0., 0., -1.], device=self.device)
+        gravity_vec = gravity_vec.unsqueeze(0).expand(self.num_envs, -1)
+        
+        # 将世界坐标系的重力向量转换到头部坐标系
+        head_projected_gravity = quat_rotate_inverse(head_quat, gravity_vec)
+        
+        # head_projected_gravity的x和y分量表示头部的roll和pitch偏离
+        # 如果头部直立，projected_gravity应该是[0, 0, -1]
+        return torch.sum(torch.square(head_projected_gravity[:, :2]), dim=1)
