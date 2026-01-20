@@ -54,7 +54,7 @@ class TaksT1MimicPrivCfg(HumanoidMimicCfg):
                      1.0, 1.0, 1.0,  # waist
                      1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,  # Left Arm
                      1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,  # Right Arm
-                     0.5, 0.5, 0.5,  # Neck - 降低颈部权重防止仰头
+                     1.0, 1.0, 1.0,  # Neck
                      ]
         
         global_obs = False
@@ -127,7 +127,7 @@ class TaksT1MimicPrivCfg(HumanoidMimicCfg):
                     'shoulder': 2.0,
                     'elbow': 2.0,
                     'wrist': 1.0,
-                    'neck': 0.5,
+                    'neck': 1.0,
                     }
 
         action_scale = 0.5

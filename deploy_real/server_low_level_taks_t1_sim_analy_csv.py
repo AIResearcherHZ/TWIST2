@@ -183,7 +183,7 @@ class RealTimePolicyController:
                 # right arm
                 2.0, 2.0, 2.0, 2.0, 1.0, 1.0, 1.0,
                 # neck
-                0.5, 0.5, 0.5,
+                1.0, 1.0, 1.0,
             ])
         
         # # ========== 使用 real 文件参数 (GLOBAL_KP/GLOBAL_KD) ==========
@@ -244,7 +244,6 @@ class RealTimePolicyController:
             ])
 
         # Action scale from taks_t1_mimic_distill_config.py: action_scale = 0.5
-        # Neck uses smaller scale (0.3) for finer control
         self.action_scale = np.array([
                 # left leg (6)
                 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
@@ -257,7 +256,7 @@ class RealTimePolicyController:
                 # right arm (7)
                 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
                 # neck (3) - smaller scale for finer control
-                0.3, 0.3, 0.3,
+                0.5, 0.5, 0.5,
             ])
 
         self.ankle_idx = [4, 5, 10, 11]

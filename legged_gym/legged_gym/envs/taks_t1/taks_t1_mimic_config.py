@@ -42,7 +42,7 @@ class TaksT1MimicCfg(HumanoidMimicCfg):
                      1.0, 1.0, 1.0,  # waist yaw, roll, pitch
                      1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,  # Left Arm (7 DOF with wrist)
                      1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,  # Right Arm (7 DOF with wrist)
-                     0.5, 0.5, 0.5,  # Neck (yaw, roll, pitch) - 降低颈部权重，特别是pitch防止仰头
+                     1.0, 1.0, 1.0,  # Neck (yaw, roll, pitch)
                      ]
         
         global_obs = False
@@ -115,7 +115,7 @@ class TaksT1MimicCfg(HumanoidMimicCfg):
                      'shoulder': 2.0,
                      'elbow': 2.0,
                      'wrist': 1.0,
-                     'neck': 0.5,
+                     'neck': 1.0,
                      }
         
         action_scale = 0.5
