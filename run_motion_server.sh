@@ -12,7 +12,8 @@ robot_type="${1:-unitree_g1_with_hands}"
 # Select motion file based on robot type
 if [ "$robot_type" == "taks_t1" ]; then
     # Taks_T1 uses 32 DOF motion files
-    motion_file="../../GMR/data/TWIST2_dataset/example_motions_taks_t1/accad_A5__Pick_up_box.pkl" # 难
+    motion_file="../../GMR/data/TWIST2_dataset/example_motions_taks_t1/0807_yanjie_walk_001.pkl"
+    # motion_file="../../GMR/data/TWIST2_dataset/example_motions_taks_t1/accad_A5__Pick_up_box.pkl" # 难
     # motion_file="../../GMR/data/TWIST2_dataset/example_motions_taks_t1/accad_B22____side_step_left.pkl" # 抬脚权重太低
     # motion_file="../../GMR/data/TWIST2_dataset/example_motions_taks_t1/accad_D15___switch_stance.pkl"
     # motion_file="../../GMR/data/TWIST2_dataset/example_motions_taks_t1/accad_A1___Stand.pkl"
