@@ -813,8 +813,8 @@ class TaksT1MimicFuture(TaksT1MimicDistill):
         """惩罚头部neck三关节偏离默认位置（L1范数）。
         Taks_T1的neck关节索引: [29, 30, 31] (neck yaw, roll, pitch)
         """
-        # neck_dof_idx = [29, 30, 31]
-        neck_dof_idx = [30]
+        neck_dof_idx = [29, 30, 31]
+        # neck_dof_idx = [30]
         neck_pos_error = self.dof_pos[:, neck_dof_idx] - \
             self.default_dof_pos_all[:, neck_dof_idx]
         return torch.sum(torch.abs(neck_pos_error), dim=1)

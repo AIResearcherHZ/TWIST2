@@ -160,16 +160,16 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
         root_height_diff_threshold = 0.25  # 原值0.3，收紧到0.25m
         
         class scales:
-            tracking_joint_dof = 3.0  # Set to None to disable(原值2.0)
-            tracking_joint_vel = 0.3  # Set to None to disable(原值0.2)
-            tracking_root_translation_z = 1.5  # Set to None to disable(原值1.0)
-            tracking_root_rotation = 1.5  # Set to None to disable(原值1.0)
-            tracking_root_linear_vel = 1.5  # Set to None to disable(原值1.0)
-            tracking_root_angular_vel = 1.5  # Set to None to disable(原值1.0)
-            tracking_keybody_pos = 2.5  # Set to None to disable(原值2.0)
-            tracking_keybody_pos_global = 2.5  # Set to None to disable(原值2.0)
-            alive = 0.75  # Set to None to disable(原值0.5)
-            feet_slip = -0.2  # Set to None to disable(原值-0.1)
+            tracking_joint_dof = 2.0  # Set to None to disable(原值2.0)
+            tracking_joint_vel = 0.2  # Set to None to disable(原值0.2)
+            tracking_root_translation_z = 1.0  # Set to None to disable(原值1.0)
+            tracking_root_rotation = 1.0  # Set to None to disable(原值1.0)
+            tracking_root_linear_vel = 1.0  # Set to None to disable(原值1.0)
+            tracking_root_angular_vel = 1.0  # Set to None to disable(原值1.0)
+            tracking_keybody_pos = 2.0  # Set to None to disable(原值2.0)
+            tracking_keybody_pos_global = 2.0  # Set to None to disable(原值2.0)
+            alive = 0.5  # Set to None to disable(原值0.5)
+            feet_slip = -0.1  # Set to None to disable(原值-0.1)
             feet_contact_forces = -5e-4  # Set to None to disable(原值-5e-4)
             feet_stumble = -1.25  # 增强踉跄惩罚(原值-1.25)
             dof_pos_limits = -5.0  # Set to None to disable(原值-5.0)
@@ -184,10 +184,10 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             
             # 脚掌着地奖励和脚掌roll/pitch保持不动惩罚
             # feet_flat_contact = 2.0  # 脚掌全部着地奖励
-            ankle_roll_pitch_penalty = -0.05 # 脚掌roll/pitch偏离惩罚
+            # ankle_roll_pitch_penalty = -0.05 # 脚掌roll/pitch偏离惩罚
             
             # 头部neck三关节保持不动惩罚
-            neck_dof_penalty = -10.0  # neck三关节偏离惩罚(原值-0.5)
+            neck_dof_penalty = -5.0  # neck三关节偏离惩罚(原值-0.5)
             
             # 头部姿态直立惩罚（基于head link的orientation）
             # head_orientation_penalty = -2.0  # 头部roll/pitch偏离直立惩罚(原值-0.5)
