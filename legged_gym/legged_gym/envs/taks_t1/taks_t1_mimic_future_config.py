@@ -60,7 +60,7 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             only_apply_resistance_when_walking = True
 
     class motion(TaksT1MimicPrivCfg.motion):
-        motion_file = f"{LEGGED_GYM_ROOT_DIR}/motion_data_configs/taks_t1_demo.yaml"
+        motion_file = f"{LEGGED_GYM_ROOT_DIR}/motion_data_configs/taks_t1_ceshi.yaml"
         # Set to None to completely disable motion curriculum
         motion_curriculum = True  # Set to None/False to disable
         motion_curriculum_gamma = 0.01
@@ -184,10 +184,10 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             
             # 脚掌着地奖励和脚掌roll/pitch保持不动惩罚
             # feet_flat_contact = 2.0  # 脚掌全部着地奖励
-            # ankle_roll_pitch_penalty = -0.05 # 脚掌roll/pitch偏离惩罚
+            ankle_roll_pitch_penalty = -0.05 # 脚掌roll/pitch偏离惩罚
             
             # 头部neck三关节保持不动惩罚
-            neck_dof_penalty = -7.5  # neck三关节偏离惩罚(原值-0.5)
+            neck_dof_penalty = -1.0  # neck三关节偏离惩罚(原值-0.5)
             
             # 头部姿态直立惩罚（基于head link的orientation）
             # head_orientation_penalty = -2.0  # 头部roll/pitch偏离直立惩罚(原值-0.5)
@@ -196,8 +196,8 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             pelvis_lin_acc = -5e-7  # 骨盆线性加速度惩罚
             pelvis_ang_acc = -1e-7  # 骨盆角加速度惩罚
             
-            # 姿态保持 - 保持躯干平坦
-            flat_orientation = -0.5  # roll/pitch偏离惩罚(原值-0.5)
+            # # 姿态保持 - 保持躯干平坦
+            # flat_orientation = -0.5  # roll/pitch偏离惩罚(原值-0.5)
 
             # 未来动作一致性奖励（只在训练时生效）- Set to None to disable
             future_action_consistency = 1.0  # Set to None to disable
