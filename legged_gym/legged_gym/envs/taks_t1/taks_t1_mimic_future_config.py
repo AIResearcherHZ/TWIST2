@@ -187,7 +187,7 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             # ankle_roll_pitch_penalty = -0.05 # 脚掌roll/pitch偏离惩罚
             
             # 头部neck三关节保持不动惩罚
-            neck_dof_penalty = -5.0  # neck三关节偏离惩罚(原值-0.5)
+            neck_dof_penalty = -7.5  # neck三关节偏离惩罚(原值-0.5)
             
             # 头部姿态直立惩罚（基于head link的orientation）
             # head_orientation_penalty = -2.0  # 头部roll/pitch偏离直立惩罚(原值-0.5)
