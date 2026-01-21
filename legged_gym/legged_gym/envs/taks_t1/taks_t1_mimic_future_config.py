@@ -96,7 +96,7 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
 
         push_robots = (True and domain_rand_general)
         push_interval_s = 4
-        max_push_vel_xy = 2.0   # 原值1.0
+        max_push_vel_xy = 1.0   # 原值1.0
 
         push_end_effector = (False and domain_rand_general)
         push_end_effector_interval_s = 2
@@ -184,10 +184,10 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             
             # 脚掌着地奖励和脚掌roll/pitch保持不动惩罚
             # feet_flat_contact = 2.0  # 脚掌全部着地奖励
-            # ankle_roll_pitch_penalty = -0.05 # 脚掌roll/pitch偏离惩罚
+            ankle_roll_pitch_penalty = -0.05 # 脚掌roll/pitch偏离惩罚
             
             # 头部neck三关节保持不动惩罚
-            neck_dof_penalty = -1.0  # neck三关节偏离惩罚(原值-0.5)
+            neck_dof_penalty = -0.5  # neck三关节偏离惩罚(原值-0.5)
             
             # 头部姿态直立惩罚（基于head link的orientation）
             # head_orientation_penalty = -2.0  # 头部roll/pitch偏离直立惩罚(原值-0.5)
