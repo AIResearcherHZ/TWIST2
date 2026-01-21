@@ -1,5 +1,224 @@
 root_path: ../../../GMR/data/TWIST2_dataset/
 motions:
+- file: OMOMO_taks_t1/sub1_clothesstand_000.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_001.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_002.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_003.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_004.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_005.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_006.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_007.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_008.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_009.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_010.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_011.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_012.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_013.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_014.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_015.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_016.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_017.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_018.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_019.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_020.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_021.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_022.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_023.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_024.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_025.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_026.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_027.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_028.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_029.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_030.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_031.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_032.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_033.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_034.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_035.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_036.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_037.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_038.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_039.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_040.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_041.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_042.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_043.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_044.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_045.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_046.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_047.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_048.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_049.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_050.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_051.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_052.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_053.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_054.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_055.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_056.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_057.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_058.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_059.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_060.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_061.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_062.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_063.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_064.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_065.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_066.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_067.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_068.pkl
+  weight: 2.0
+  description: general movement
+- file: OMOMO_taks_t1/sub1_clothesstand_069.pkl
+  weight: 2.0
+  description: general movement
+
+
+
+
+
+
+
+
+
 - file: example_motions_taks_t1/0807_yanjie_walk_001.pkl
   weight: 1.0
   description: general movement
