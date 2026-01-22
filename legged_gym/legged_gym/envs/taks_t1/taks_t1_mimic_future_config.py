@@ -178,16 +178,16 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             dof_acc = -1e-7  # Set to None to disable(原值-1e-7)
             action_rate = -0.1  # Set to None to disable(原值-0.1)
             feet_air_time = 5.0  # Set to None to disable(原值5.0)
-            ang_vel_xy = -0.02  # 增强角速度惩罚(原值-0.02)，抑制踉跄时的摇摆
+            ang_vel_xy = -0.05  # 增强角速度惩罚(原值-0.02)，抑制踉跄时的摇摆
             ankle_dof_acc = -1e-7 * 2  # Set to None to disable(原来是*2)
             ankle_dof_vel = -1e-4 * 2  # Set to None to disable(原来是*2)
             
             # 脚掌着地奖励和脚掌roll/pitch保持不动惩罚
-            feet_flat_contact = 2.0  # 脚掌全部着地奖励(原值2.0)
-            ankle_roll_pitch_penalty = -0.05 # 脚掌roll/pitch偏离惩罚(原值-0.05)
+            # feet_flat_contact = 2.0  # 脚掌全部着地奖励(原值2.0)
+            # ankle_roll_pitch_penalty = -0.05 # 脚掌roll/pitch偏离惩罚(原值-0.05)
             
             # 头部neck三关节保持不动惩罚
-            neck_dof_penalty = -1.0  # neck三关节偏离惩罚(原值-0.5)
+            neck_dof_penalty = -0.5  # neck三关节偏离惩罚(原值-0.5)
             
             # 头部姿态直立惩罚（基于head link的orientation）
             # head_orientation_penalty = -2.0  # 头部roll/pitch偏离直立惩罚(原值-0.5)
@@ -197,7 +197,7 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             pelvis_ang_acc = -1e-6  # 骨盆角加速度惩罚(原值-1e-7)
             
             # 姿态保持 - 保持躯干平坦
-            flat_orientation = -0.5  # roll/pitch偏离惩罚(原值-0.5)
+            flat_orientation = -2.0  # roll/pitch偏离惩罚(原值-0.5)
 
             # # 未来动作一致性奖励（只在训练时生效）- Set to None to disable
             # future_action_consistency = 1.0  # Set to None to disable
