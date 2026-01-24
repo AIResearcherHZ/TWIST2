@@ -346,12 +346,12 @@ class G1MimicPrivCfg(HumanoidMimicCfg):
         add_noise = True
         noise_increasing_steps = 50_000
         class noise_scales:
-            dof_pos = 0.01
-            dof_vel = 0.1
+            dof_pos = 0.05
+            dof_vel = 1.75
             lin_vel = 0.1
-            ang_vel = 0.1
+            ang_vel = 0.35
             gravity = 0.05
-            imu = 0.1
+            imu = 0.2
         
     class motion(HumanoidMimicCfg.motion):
         motion_curriculum = True

@@ -258,12 +258,12 @@ class TaksT1MimicPrivCfg(HumanoidMimicCfg):
         add_noise = True
         noise_increasing_steps = 50_000
         class noise_scales:
-            dof_pos = 0.01
-            dof_vel = 0.1
+            dof_pos = 0.05
+            dof_vel = 1.75
             lin_vel = 0.1
-            ang_vel = 0.1
+            ang_vel = 0.35
             gravity = 0.05
-            imu = 0.1
+            imu = 0.2
         
     class motion(HumanoidMimicCfg.motion):
         motion_curriculum = True
@@ -280,7 +280,7 @@ class TaksT1MimicPrivCfg(HumanoidMimicCfg):
         motion_smooth = True
         motion_decompose = False
 
-        motion_file = f"{LEGGED_GYM_ROOT_DIR}/motion_data_configs/taks_t1_demo.yaml"
+        motion_file = f"{LEGGED_GYM_ROOT_DIR}/motion_data_configs/taks_t1_ceshi.yaml"
 
 
 class TaksT1MimicStuCfg(TaksT1MimicPrivCfg):

@@ -120,7 +120,7 @@ class LeggedRobotCfg(BaseConfig):
         quantize_height = True
         class noise_scales:
             rotation = 0.0
-            dof_pos = 0.01
+            dof_pos = 0.05
             dof_vel = 0.05
             lin_vel = 0.05
             ang_vel = 0.05

@@ -244,8 +244,8 @@ class HumanoidCharCfg(BaseConfig):
         noise_level = 1.0 # scales other values
         noise_increasing_steps = 7000
         class noise_scales:
-            dof_pos = 0.01
-            dof_vel = 0.15
+            dof_pos = 0.05
+            dof_vel = 1.75
             lin_vel = 0.1
             ang_vel = 0.2
             gravity = 0.05

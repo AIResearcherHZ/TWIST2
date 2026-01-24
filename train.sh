@@ -31,6 +31,6 @@ python train.py --task "${task_name}" \
                 --num_envs "${num_envs}" \
                 --exptid "${exptid}" \
                 --device "${device}" \
-                --teacher_exptid "None" \
-                --resume
+                --teacher_exptid "None" 
+                # --resume
                 # --debug  # 调试模式（可视化）
