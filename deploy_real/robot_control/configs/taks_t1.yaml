@@ -22,14 +22,14 @@ kps: [100, 100, 100, 150, 40, 40,   # left leg: hip_pitch, hip_roll, hip_yaw, kn
       150, 150, 150,                # waist
       40, 40, 40, 40, 20, 20, 20,   # left arm
       40, 40, 40, 40, 20, 20, 20,   # right arm
-      20, 20, 20]                # neck
+      10, 10, 10]                # neck
 
 kds: [3.3, 3.3, 3.3, 5.0, 2.0, 2.0,   # left leg: hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll
       3.3, 3.3, 3.3, 5.0, 2.0, 2.0,   # right leg
       5.0, 5.0, 5.0,            # waist
       2.0, 2.0, 2.0, 2.0, 1.0, 1.0, 1.0,  # left arm
       2.0, 2.0, 2.0, 2.0, 1.0, 1.0, 1.0,  # right arm
-      1.0, 1.0, 1.0]      # neck
+      0.25, 0.25, 0.25]      # neck
 
 default_angles: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0,   # left leg
                 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,    # right leg

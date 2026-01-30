@@ -163,7 +163,7 @@ class RealTimePolicyController:
                 # right arm: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow, wrist_roll, wrist_yaw, wrist_pitch
                 40, 40, 40, 40, 20, 20, 20,
                 # neck: yaw, roll, pitch
-                20, 20, 20,
+                10, 10, 10,
             ])
         # Damping values aligned with taks_t1_mimic_distill_config.py control settings
         # hip_yaw: 5, hip_roll: 5, hip_pitch: 5, knee: 5, ankle: 2
@@ -180,7 +180,7 @@ class RealTimePolicyController:
                 # right arm
                 2.0, 2.0, 2.0, 2.0, 1.0, 1.0, 1.0,
                 # neck
-                1.0, 1.0, 1.0,
+                0.25, 0.25, 0.25,
             ])
 
         # Torque limits from XML actuatorfrcrange
