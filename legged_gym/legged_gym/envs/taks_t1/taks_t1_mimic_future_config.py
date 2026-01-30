@@ -96,7 +96,7 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
 
         push_robots = (True and domain_rand_general)
         push_interval_s = 4
-        max_push_vel_xy = 1.0   # 原值1.0
+        max_push_vel_xy = 2.0   # 原值1.0
 
         push_end_effector = (False and domain_rand_general)
         push_end_effector_interval_s = 2
@@ -124,13 +124,13 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
         sensor_latency_spike_prob = 0.001
         sensor_latency_max_steps = 10
         
-        # # 惯量随机化 - 模拟电机转子惯量不确定性
-        # randomize_armature = (True and domain_rand_general)
-        # armature_range = [0.5, 2.0]  # 惯量缩放范围
+        # 惯量随机化 - 模拟电机转子惯量不确定性
+        randomize_armature = (True and domain_rand_general)
+        armature_range = [0.5, 2.0]  # 惯量缩放范围
         
-        # # 刚体惯性随机化 - 模拟连杆惯性不确定性
-        # randomize_link_inertia = (True and domain_rand_general)
-        # link_inertia_range = [0.5, 2.0]  # 刚体惯性缩放范围
+        # 刚体惯性随机化 - 模拟连杆惯性不确定性
+        randomize_link_inertia = (True and domain_rand_general)
+        link_inertia_range = [0.5, 2.0]  # 刚体惯性缩放范围
 
         # # PD增益随机化 - 模拟关节刚度和阻尼不确定性
         # randomize_pd_gain = (True and domain_rand_general)
@@ -145,7 +145,7 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             ang_vel = 0.35   # rad/s, 角速度噪声
             imu = 0.2       # rad, roll/pitch噪声
             dof_pos = 0.05  # rad, 电机位置噪声
-            dof_vel = 1.75   # rad/s, 电机速度噪声
+            dof_vel = 2.0   # rad/s, 电机速度噪声
 
     class rewards(TaksT1MimicPrivCfg.rewards):
         # All reward scales can be set to None to completely disable that reward
@@ -154,10 +154,10 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
         # ==================== 踉跄控制参数 ====================
         # 收紧termination条件以减少踉跄时间
         # 原值4.0太宽松(约229°)，收紧到1.57(约90°)可更快终止踉跄状态
-        termination_roll = 4.0   # 原值4.0，收紧以更快检测踉跄
-        termination_pitch = 4.0  # 原值4.0，收紧以更快检测踉跄
+        termination_roll = 2.0   # 原值4.0，收紧以更快检测踉跄
+        termination_pitch = 2.0  # 原值4.0，收紧以更快检测踉跄
         # 高度差阈值：原值0.3m，收紧到0.25m，以更快检测失衡
-        root_height_diff_threshold = 0.3  # 原值0.3，收紧到0.25m
+        root_height_diff_threshold = 0.25  # 原值0.3，收紧到0.25m
         
         class scales:
             tracking_joint_dof = 2.0  # Set to None to disable(原值2.0)
@@ -192,12 +192,12 @@ class TaksT1MimicStuFutureCfg(TaksT1MimicPrivCfg):
             # 头部姿态直立惩罚（基于head link的orientation）
             # head_orientation_penalty = -2.0  # 头部roll/pitch偏离直立惩罚(原值-0.5)
             
-            # 骨盆加速度约束 - 鼓励平滑运动
-            pelvis_lin_acc = -5e-7  # 骨盆线性加速度惩罚(原值-5e-7)
-            pelvis_ang_acc = -1e-7  # 骨盆角加速度惩罚(原值-1e-7)
+            # # 骨盆加速度约束 - 鼓励平滑运动
+            # pelvis_lin_acc = -5e-7  # 骨盆线性加速度惩罚(原值-5e-7)
+            # pelvis_ang_acc = -1e-7  # 骨盆角加速度惩罚(原值-1e-7)
             
-            # 姿态保持 - 保持躯干平坦
-            flat_orientation = -0.5  # roll/pitch偏离惩罚(原值-0.5)
+            # # 姿态保持 - 保持躯干平坦
+            # flat_orientation = -0.5  # roll/pitch偏离惩罚(原值-0.5)
 
             # 未来动作一致性奖励（只在训练时生效）- Set to None to disable
             future_action_consistency = 1.0  # Set to None to disable
