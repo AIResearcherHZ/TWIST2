@@ -80,8 +80,8 @@
         <geom type="mesh" rgba="1.0 1.0 1.0 1" mesh="left_hip_pitch_link" />
 
         <body name="left_hip_roll_link" pos="0.00795 0.0765 -0.04167" quat="0.996195 0 -0.0871557 0">
-          <inertial pos="-0.007369 -0.000032 -0.073928" quat="0.617210 0.003424 0.786788 0.002045" mass="0.79"
-        diaginertia="0.000472727 0.000626126 0.000641084" />
+          <inertial pos="-0.001024 -0.000004 -0.060249" quat="0.593000 0.000065 0.805202 0.000058" mass="0.79"
+        diaginertia="0.000556908 0.00104397 0.00115351" />
           <joint name="left_hip_roll_joint" pos="0 0 0" axis="1 0 0" range="-0.5236 2.9671"
             actuatorfrcrange="-97 97" class="leg_motor" />
           <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1.0 1.0 1.0 1"
@@ -89,8 +89,8 @@
           <geom type="mesh" rgba="1.0 1.0 1.0 1" mesh="left_hip_roll_link" />
 
           <body name="left_hip_yaw_link" pos="0.00829 0.0 -0.1094">
-            <inertial pos="-0.046231 0.023584 -0.159502" quat="0.577194 -0.562660 -0.408699 -0.428048" mass="1.822"
-        diaginertia="0.00191107 0.00364049 0.00473262" />
+            <inertial pos="-0.042586 0.024809 -0.158574" quat="0.611846 -0.534833 -0.395188 -0.428281" mass="1.822"
+        diaginertia="0.00208373 0.00482553 0.00602348" />
             <joint name="left_hip_yaw_joint" pos="0 0 0" axis="0 0 1" range="-2.7576 2.7576"
               actuatorfrcrange="-97 97" class="leg_motor" />
             <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1.0 1.0 1.0 1"
@@ -98,8 +98,8 @@
             <geom type="mesh" rgba="1.0 1.0 1.0 1" mesh="left_hip_yaw_link" />
 
             <body name="left_knee_link" pos="-0.0484 0.0 -0.1665" quat="0.996195 0 0.0871557 0">
-              <inertial pos="0.010920 -0.002203 -0.156771" quat="0.678951 -0.175857 0.688367 0.185070" mass="1.138"
-        diaginertia="0.000686365 0.00368263 0.0037111" />
+              <inertial pos="0.003930 -0.003975 -0.131002" quat="-0.695925 0.066490 0.706374 0.110923" mass="1.138"
+        diaginertia="0.000615815 0.0048068 0.00482231" />
               <joint name="left_knee_joint" pos="0 0 0" axis="0 1 0" range="-0.087267 2.8798"
                 actuatorfrcrange="-120 120" class="leg_motor" />
               <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1.0 1.0 1.0 1"
@@ -143,8 +143,8 @@
         <geom type="mesh" rgba="1.0 1.0 1.0 1" mesh="right_hip_pitch_link" />
 
         <body name="right_hip_roll_link" pos="0.00795 -0.077 -0.04167" quat="0.996195 0 -0.0871557 0">
-          <inertial pos="-0.007370 0.000033 -0.073928" quat="-0.003396 -0.617202 0.002105 0.786795" mass="0.79"
-        diaginertia="0.000472728 0.000626098 0.000641055" />
+          <inertial pos="-0.001024 -0.000004 -0.060249" quat="0.593000 0.000065 0.805202 0.000058" mass="0.79"
+        diaginertia="0.000556908 0.00104397 0.00115351" />
           <joint name="right_hip_roll_joint" pos="0 0 0" axis="1 0 0" range="-2.9671 0.5236"
             actuatorfrcrange="-97 97" class="leg_motor" />
           <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1.0 1.0 1.0 1"
@@ -152,8 +152,8 @@
           <geom type="mesh" rgba="1.0 1.0 1.0 1" mesh="right_hip_roll_link" />
 
           <body name="right_hip_yaw_link" pos="0.00829 0.0 -0.1094">
-            <inertial pos="-0.046230 -0.023584 -0.159501" quat="-0.428050 -0.408699 -0.562659 0.577194" mass="1.822"
-        diaginertia="0.00191107 0.00364058 0.0047327" />
+            <inertial pos="-0.042689 -0.024539 -0.158542" quat="-0.427414 -0.395165 -0.535773 0.611645" mass="1.822"
+        diaginertia="0.00209418 0.00478277 0.00597518" />
             <joint name="right_hip_yaw_joint" pos="0 0 0" axis="0 0 1" range="-2.7576 2.7576"
               actuatorfrcrange="-97 97" class="leg_motor" />
             <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1.0 1.0 1.0 1"
@@ -161,8 +161,8 @@
             <geom type="mesh" rgba="1.0 1.0 1.0 1" mesh="right_hip_yaw_link" />
 
             <body name="right_knee_link" pos="-0.0484 -0.0005 -0.1665" quat="0.996195 0 0.0871557 0">
-              <inertial pos="0.010319 0.003045 -0.153717" quat="0.437005 0.556898 -0.429215 0.560950" mass="1.138"
-        diaginertia="0.000690132 0.00417376 0.00420862" />
+              <inertial pos="0.005297 0.004887 -0.128398" quat="-0.082088 0.692584 0.126187 0.705454" mass="1.138"
+        diaginertia="0.000660407 0.00591153 0.00594623" />
               <joint name="right_knee_joint" pos="0 0 0" axis="0 1 0" range="-0.087267 2.8798"
                 actuatorfrcrange="-120 120" class="leg_motor" />
               <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1.0 1.0 1.0 1"
